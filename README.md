@@ -51,8 +51,4 @@ npm start
 ---
 *© 2026 Pin Ups Store. Todos los derechos reservados.*
 
----
-
-### Tips adicionales para tu README:
-*   **Imagen destacada:** Si tienes un logo o una captura de pantalla bonita de la tienda, agrégala justo debajo del título principal con `![Logo](URL_DE_TU_IMAGEN)`.
 *   **Roadmap:** Si planeas agregar un carrito de compras real, pasarela de pagos (MercadoPago) o un panel de administración, puedes añadir una sección de **"Próximas funcionalidades"** para que tu proyecto se vea más profesional.
