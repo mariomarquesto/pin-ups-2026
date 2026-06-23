@@ -1,0 +1,29 @@
+/* src/pages/Home.css */
+.heroSection {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.heroSection .carousel,
+.heroSection .carousel-inner,
+.heroSection .carousel-item img {
+  border-radius: 0 !important;
+}a/* Eliminar márgenes y paddings del slider */
+.carousel,
+.carousel-inner,
+.carousel-item {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.carousel-item img {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+/* Asegurar que no haya bordes redondeados */
+.carousel-item:first-child img {
+  border-radius: 0 !important;
+}

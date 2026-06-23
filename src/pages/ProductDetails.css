@@ -1,0 +1,37 @@
+/* src/pages/ProductDetails.css */
+
+/* Animación suave para imágenes */
+img {
+  transition: transform 0.3s ease;
+}
+
+img:hover {
+  transform: scale(1.02);
+}
+
+/* Breadcrumb interactivo */
+.cursor-pointer {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.cursor-pointer:hover {
+  color: #f85606;
+}
+
+/* Badge descuento */
+.badge-discount {
+  font-size: 0.75rem;
+}
+
+/* Miniaturas activas */
+.border-warning {
+  border-color: #f85606 !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .tracking-wide {
+    letter-spacing: 0.5px;
+  }
+}

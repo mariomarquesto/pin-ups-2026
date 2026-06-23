@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "title": "Vestido Midi Curvy Elegance",
+    "price": 45000,
+    "discountPercentage": 15,
+    "rating": 4.8,
+    "brand": "Pin Ups",
+    "category": "vestidos",
+    "thumbnail": "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800"
+  },
+  {
+    "id": 2,
+    "title": "Vestido Floral Primavera",
+    "price": 52000,
+    "discountPercentage": 10,
+    "rating": 4.9,
+    "brand": "Pin Ups",
+    "category": "vestidos",
+    "thumbnail": "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800"
+  },
+  {
+    "id": 3,
+    "title": "Remera Básica Oversize",
+    "price": 24000,
+    "discountPercentage": 5,
+    "rating": 4.5,
+    "brand": "Pin Ups",
+    "category": "remeras",
+    "thumbnail": "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800"
+  },
+  {
+    "id": 4,
+    "title": "Remera Estampada Curvy",
+    "price": 28000,
+    "discountPercentage": 8,
+    "rating": 4.8,
+    "brand": "Pin Ups",
+    "category": "remeras",
+    "thumbnail": "https://images.unsplash.com/photo-1503342217505-b0a15ec3261c?w=800"
+  },
+  {
+    "id": 5,
+    "title": "Jean Mom Fit Premium",
+    "price": 42000,
+    "discountPercentage": 10,
+    "rating": 4.9,
+    "brand": "Pin Ups",
+    "category": "pantalones",
+    "thumbnail": "https://images.unsplash.com/photo-1582418702059-97ebafb35d09?w=800"
+  },
+  {
+    "id": 6,
+    "title": "Pantalón Oxford Tiro Alto",
+    "price": 39000,
+    "discountPercentage": 8,
+    "rating": 4.8,
+    "brand": "Pin Ups",
+    "category": "pantalones",
+    "thumbnail": "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=800"
+  },
+  {
+    "id": 7,
+    "title": "Campera Gabardina Oversize",
+    "price": 85000,
+    "discountPercentage": 15,
+    "rating": 4.9,
+    "brand": "Pin Ups",
+    "category": "camperas",
+    "thumbnail": "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800"
+  },
+  {
+    "id": 8,
+    "title": "Campera Denim Curvy",
+    "price": 72000,
+    "discountPercentage": 12,
+    "rating": 4.8,
+    "brand": "Pin Ups",
+    "category": "camperas",
+    "thumbnail": "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800"
+  },
+  {
+    "id": 9,
+    "title": "Sandalias Summer Style",
+    "price": 43000,
+    "discountPercentage": 10,
+    "rating": 4.8,
+    "brand": "Pin Ups",
+    "category": "calzado",
+    "thumbnail": "https://images.unsplash.com/photo-1460353581641-37baddab0fa2?w=800"
+  },
+  {
+    "id": 10,
+    "title": "Botas Urban Chic",
+    "price": 76000,
+    "discountPercentage": 15,
+    "rating": 4.9,
+    "brand": "Pin Ups",
+    "category": "calzado",
+    "thumbnail": "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800"
+  },
+  {
+    "id": 11,
+    "title": "Cartera Urbana Premium",
+    "price": 32000,
+    "discountPercentage": 5,
+    "rating": 4.8,
+    "brand": "Pin Ups",
+    "category": "accesorios",
+    "thumbnail": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800"
+  },
+  {
+    "id": 12,
+    "title": "Collar Elegance",
+    "price": 9500,
+    "discountPercentage": 30,
+    "rating": 4.7,
+    "brand": "Pin Ups",
+    "category": "accesorios",
+    "thumbnail": "https://images.unsplash.com/photo-1705326452390-3ecf6070595f?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8Y29sbGFyJTIwZWxlZ2FudGV8ZW58MHx8MHx8fDA%3D"
+  }
+]
