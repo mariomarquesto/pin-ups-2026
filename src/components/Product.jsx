@@ -23,7 +23,6 @@ function Product() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        // Intentar cargar desde Supabase
         const { data, error } = await supabase
           .from('products')
           .select('*')
@@ -33,7 +32,6 @@ function Product() {
           console.log('✅ Productos cargados desde Supabase:', data.length);
           setProductos(data);
         } else {
-          // Fallback: usar JSON local
           console.log('📦 Usando productos locales (JSON)');
           setProductos(productList);
         }
@@ -87,16 +85,29 @@ function Product() {
   return (
     <div className='d-flex flex-wrap justify-content-center gap-4 py-4'>
       {productos.map((item, index) => {
-        // Manejar descuento (funciona con JSON o Supabase)
-        const discount = item.discountPercentage || item.discount_percentage || 0;
+        // Soporte tanto para Supabase (name, images[], compare_at_price) como para JSON antiguo
+        const title = item.name || item.title || 'Producto';
         const price = item.price || 0;
-        const finalPrice = discount > 0 
-          ? Math.round(price - (price * discount / 100))
-          : price;
-        const imageUrl = item.thumbnail || item.image || 'https://via.placeholder.com/300';
-        const title = item.title || 'Producto';
-        const brand = item.brand || '';
-        const rating = item.rating || 0;
+        
+        // Manejo de imágenes (si es array de Supabase usa la primera, si es string usa esa, o un fallback seguro)
+        let imageUrl = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
+        if (Array.isArray(item.images) && item.images.length > 0) {
+          imageUrl = item.images[0];
+        } else if (item.thumbnail) {
+          imageUrl = item.thumbnail;
+        } else if (item.image) {
+          imageUrl = item.image;
+        }
+
+        // Cálculo de descuento basado en compare_at_price si existe
+        let discount = item.discountPercentage || item.discount_percentage || 0;
+        if (!discount && item.compare_at_price && item.compare_at_price > price) {
+          discount = Math.round(((item.compare_at_price - price) / item.compare_at_price) * 100);
+        }
+
+        const finalPrice = price;
+        const brand = item.brand || 'Pin-Ups Indumentaria';
+        const rating = item.rating || 5;
         const productId = item.id;
         
         return (
@@ -137,9 +148,9 @@ function Product() {
                       <span className='fw-bold price-pulse' style={{ color: '#f85606', fontSize: '1.2rem' }}>
                         {formatearPrecio(finalPrice)}
                       </span>
-                      {discount > 0 && (
+                      {item.compare_at_price && item.compare_at_price > price && (
                         <span className="text-decoration-line-through text-muted small">
-                          {formatearPrecio(price)}
+                          {formatearPrecio(item.compare_at_price)}
                         </span>
                       )}
                     </div>

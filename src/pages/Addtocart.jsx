@@ -1,9 +1,13 @@
+// src/pages/Addtocart.jsx
 import { useEffect, useState, useCallback } from "react";
 import { Button, Card, Container, Row, Col, Image } from "react-bootstrap";
 import { FaTrashAlt, FaPlus, FaMinus, FaShoppingCart } from "react-icons/fa";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const Addtocart = () => {
+  const navigate = useNavigate();
+  const isLoggedIn = JSON.parse(localStorage.getItem('loggedIn'));
+
   const [cart, setCart] = useState([]);
   const [total, setTotal] = useState(0);
   const [subtotal, setSubtotal] = useState(0);
@@ -16,9 +20,10 @@ const Addtocart = () => {
 
   const calculateTotals = useCallback(() => {
     const subtotalAmount = cart.reduce((acc, item) => {
-      const priceWithDiscount =
-        item.price - item.price * item.discountPercentage * 0.01;
-      return acc + priceWithDiscount * item.quantity;
+      const discount = item.discountPercentage || item.discount_percentage || 0;
+      const price = item.price || 0;
+      const priceWithDiscount = price - (price * discount * 0.01);
+      return acc + (priceWithDiscount * (item.quantity || 1));
     }, 0);
 
     setSubtotal(subtotalAmount);
@@ -70,13 +75,91 @@ const Addtocart = () => {
       currency: "ARS",
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
-    }).format(price);
+    }).format(price || 0);
   };
 
   const calculateItemPrice = (item) => {
-    const priceWithDiscount =
-      item.price - item.price * item.discountPercentage * 0.01;
-    return priceWithDiscount * item.quantity;
+    const discount = item.discountPercentage || item.discount_percentage || 0;
+    const price = item.price || 0;
+    const priceWithDiscount = price - (price * discount * 0.01);
+    return priceWithDiscount * (item.quantity || 1);
+  };
+
+  // ============================================================
+  // FUNCIONES PARA LA ORDEN DE COMPRA
+  // ============================================================
+
+  const generarNumeroOrden = () => {
+    const fecha = new Date();
+    const anio = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+    const dia = String(fecha.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `PIN-${anio}${mes}${dia}-${random}`;
+  };
+
+  const formatearFecha = () => {
+    const fecha = new Date();
+    return fecha.toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const handleCheckout = () => {
+    if (!isLoggedIn) {
+      alert('💄 Iniciá sesión para finalizar tu compra');
+      navigate('/login');
+      return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('users'));
+    const telefonoUsuario = user?.phone || 'No especificado';
+    const emailUsuario = user?.email || 'No especificado';
+    const nombreUsuario = user?.fName && user?.lName 
+      ? `${user.fName} ${user.lName}` 
+      : user?.fName || 'Cliente Pin Ups';
+
+    const productosOrden = cart.map(item => {
+      const discount = item.discountPercentage || item.discount_percentage || 0;
+      const price = item.price || 0;
+      const priceWithDiscount = price - (price * discount * 0.01);
+      return {
+        id: item.id,
+        titulo: item.title || item.name || 'Producto',
+        cantidad: item.quantity || 1,
+        precioUnitario: priceWithDiscount,
+        subtotal: priceWithDiscount * (item.quantity || 1)
+      };
+    });
+
+    const orden = {
+      numeroOrden: generarNumeroOrden(),
+      fecha: formatearFecha(),
+      cliente: {
+        nombre: nombreUsuario,
+        email: emailUsuario,
+        telefono: telefonoUsuario
+      },
+      productos: productosOrden,
+      subtotal: subtotal,
+      envio: shippingCost,
+      total: total,
+      observaciones: `Cliente solicita factura tipo A/B/C. Contactar para coordinar pago y envío.`,
+      estado: 'pendiente'
+    };
+
+    const ordenes = JSON.parse(localStorage.getItem('ordenes')) || [];
+    ordenes.push(orden);
+    localStorage.setItem('ordenes', JSON.stringify(ordenes));
+    localStorage.setItem('ultimaOrden', JSON.stringify(orden));
+    
+    // Redirigir a la pantalla de confirmación interna sin abrir WhatsApp
+    navigate('/orden-confirmada');
   };
 
   if (cart.length === 0) {
@@ -122,10 +205,12 @@ const Addtocart = () => {
 
           {cart.map((item, index) => {
             const itemTotal = calculateItemPrice(item);
-            const hasDiscount = item.discountPercentage > 0;
-            const originalPrice = item.price;
-            const discountedPrice =
-              originalPrice - originalPrice * item.discountPercentage * 0.01;
+            const discount = item.discountPercentage || item.discount_percentage || 0;
+            const hasDiscount = discount > 0;
+            const originalPrice = item.price || 0;
+            const discountedPrice = originalPrice - (originalPrice * discount * 0.01);
+            const itemImage = item.thumbnail || item.image || 'https://via.placeholder.com/100';
+            const itemTitle = item.title || item.name || 'Producto';
 
             return (
               <Card
@@ -136,13 +221,13 @@ const Addtocart = () => {
                   {/* Imagen */}
                   <Col xs={4} md={3} className="bg-light p-3 text-center">
                     <Image
-                      src={item.thumbnail}
-                      alt={item.title}
+                      src={itemImage}
+                      alt={itemTitle}
                       fluid
                       className="rounded-3"
                       style={{ maxHeight: "100px", objectFit: "contain" }}
                       onError={(e) =>
-                        (e.target.src = "/images/placeholder.jpg")
+                        (e.target.src = "https://via.placeholder.com/100")
                       }
                     />
                   </Col>
@@ -151,10 +236,10 @@ const Addtocart = () => {
                   <Col xs={8} md={5}>
                     <Card.Body className="py-2 py-md-3">
                       <Card.Title className="fs-6 fw-bold mb-1">
-                        {item.title}
+                        {itemTitle}
                       </Card.Title>
                       <Card.Text className="small text-muted mb-2">
-                        {item.brand}
+                        {item.brand || 'Pin Ups'}
                       </Card.Text>
 
                       <div className="d-flex flex-wrap gap-2 align-items-center">
@@ -170,7 +255,7 @@ const Addtocart = () => {
                               {formatPrice(originalPrice)}
                             </span>
                             <span className="badge bg-danger rounded-pill">
-                              -{item.discountPercentage}%
+                              -{discount}%
                             </span>
                           </>
                         )}
@@ -188,7 +273,7 @@ const Addtocart = () => {
                           className="rounded-circle d-flex align-items-center justify-content-center"
                           style={{ width: "32px", height: "32px" }}
                           onClick={() =>
-                            updateQuantity(item.id, item.quantity - 1)
+                            updateQuantity(item.id, (item.quantity || 1) - 1)
                           }
                         >
                           <FaMinus size={12} />
@@ -197,7 +282,7 @@ const Addtocart = () => {
                           className="fw-semibold mx-2"
                           style={{ minWidth: "40px", textAlign: "center" }}
                         >
-                          {item.quantity}
+                          {item.quantity || 1}
                         </span>
                         <Button
                           variant="light"
@@ -205,7 +290,7 @@ const Addtocart = () => {
                           className="rounded-circle d-flex align-items-center justify-content-center"
                           style={{ width: "32px", height: "32px" }}
                           onClick={() =>
-                            updateQuantity(item.id, item.quantity + 1)
+                            updateQuantity(item.id, (item.quantity || 1) + 1)
                           }
                         >
                           <FaPlus size={12} />
@@ -223,7 +308,7 @@ const Addtocart = () => {
                           variant="link"
                           size="sm"
                           className="text-danger p-0"
-                          onClick={() => removeItem(item.id, item.title)}
+                          onClick={() => removeItem(item.id, itemTitle)}
                         >
                           <FaTrashAlt size={14} />
                         </Button>
@@ -272,6 +357,7 @@ const Addtocart = () => {
               <Button
                 className="w-100 py-2 rounded-pill fw-semibold border-0 mb-3"
                 style={{ backgroundColor: "#f85606", color: "white" }}
+                onClick={handleCheckout}
               >
                 Finalizar compra 💳
               </Button>

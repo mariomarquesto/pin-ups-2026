@@ -25,14 +25,15 @@ const ProductDetails = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       setLoading(true);
+      setActiveImage(0); // Reiniciar al primer ángulo al cambiar de producto
       
       try {
-        // Intentar cargar desde Supabase
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('id', parseInt(id))
-          .single();
+        // Intentar cargar desde Supabase (id puede ser UUID o numérico según tu BD)
+        const query = isNaN(id) 
+          ? supabase.from('products').select('*').eq('id', id).single()
+          : supabase.from('products').select('*').eq('id', parseInt(id)).single();
+
+        const { data, error } = await query;
         
         if (!error && data) {
           console.log('✅ Producto cargado desde Supabase');
@@ -40,13 +41,12 @@ const ProductDetails = () => {
         } else {
           // Fallback: buscar en JSON local
           console.log('📦 Usando producto local (JSON)');
-          const found = productList.find(p => p.id === parseInt(id));
+          const found = productList.find(p => p.id === parseInt(id) || p.id === id);
           setProduct(found);
         }
       } catch (err) {
         console.error('Error al cargar producto:', err);
-        // Fallback a JSON
-        const found = productList.find(p => p.id === parseInt(id));
+        const found = productList.find(p => p.id === parseInt(id) || p.id === id);
         setProduct(found);
       } finally {
         setLoading(false);
@@ -76,7 +76,7 @@ const ProductDetails = () => {
     </Container>
   );
 
-  // Manejar campos según origen (Supabase o JSON)
+  // Manejar campos e imágenes múltiples (Supabase o JSON)
   const discount = product.discountPercentage || product.discount_percentage || 0;
   const price = product.price || 0;
   const precioFinal = discount > 0 
@@ -84,9 +84,25 @@ const ProductDetails = () => {
     : price;
   const rating = product.rating || 0;
   const brand = product.brand || 'Pin Ups';
-  const thumbnail = product.thumbnail || product.image || 'https://via.placeholder.com/400';
-  const title = product.title || 'Producto';
-  
+  const title = product.name || product.title || 'Producto';
+
+  // Obtener array de imágenes (compatible con múltiples ángulos)
+  let imagesArray = [];
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    imagesArray = product.images;
+  } else if (typeof product.images === 'string' && product.images.trim() !== '') {
+    imagesArray = [product.images];
+  } else if (product.thumbnail) {
+    imagesArray = [product.thumbnail];
+  } else if (product.image) {
+    imagesArray = [product.image];
+  } else {
+    imagesArray = ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600'];
+  }
+
+  // Asegurar al menos 3 elementos para las vistas previas si hay pocos
+  const currentImage = imagesArray[activeImage] || imagesArray[0];
+
   const formatear = (val) => new Intl.NumberFormat('es-AR', { 
     style: 'currency', 
     currency: 'ARS', 
@@ -138,32 +154,9 @@ const ProductDetails = () => {
     let cart = JSON.parse(localStorage.getItem('cart')) || [];
     const exist = cart.findIndex(i => i.id === product.id);
     if (exist !== -1) cart[exist].quantity += count;
-    else cart.push({ ...product, quantity: count, discount_percentage: discount, price: price });
+    else cart.push({ ...product, title: title, thumbnail: imagesArray[0], quantity: count, discount_percentage: discount, price: price });
     localStorage.setItem('cart', JSON.stringify(cart));
     alert(`🛍️ ${title} agregado al carrito`);
-  };
-
-  const enviarOrdenPorWhatsApp = (orden) => {
-    const telefonoEmpresa = "5493813471147";
-    const mensaje = encodeURIComponent(
-      `🛍️ *NUEVA ORDEN DE COMPRA - PIN UPS* 🛍️\n\n` +
-      `📋 *NÚMERO DE ORDEN:* ${orden.numeroOrden}\n` +
-      `📅 *FECHA:* ${orden.fecha}\n` +
-      `👤 *CLIENTE:* ${orden.cliente.nombre}\n` +
-      `📧 *EMAIL:* ${orden.cliente.email}\n` +
-      `📞 *TELÉFONO:* ${orden.cliente.telefono}\n\n` +
-      `📦 *PRODUCTO:*\n` +
-      `   • ${orden.producto.titulo}\n` +
-      `   • Cantidad: ${orden.producto.cantidad}\n` +
-      `   • Precio unitario: ${formatear(orden.producto.precioUnitario)}\n` +
-      `   • Subtotal: ${formatear(orden.producto.subtotal)}\n\n` +
-      `💰 *TOTAL DE LA COMPRA:* ${formatear(orden.total)}\n\n` +
-      `📝 *OBSERVACIONES:* ${orden.observaciones || 'Sin observaciones'}\n\n` +
-      `✨ *ESTADO:* Pendiente de confirmación\n\n` +
-      `🔗 *PARA CONFIRMAR LA ORDEN, RESPONDER ESTE MENSAJE*`
-    );
-    
-    window.open(`https://wa.me/${telefonoEmpresa}?text=${mensaje}`, '_blank');
   };
 
   const handleBuyNow = () => {
@@ -209,7 +202,6 @@ const ProductDetails = () => {
     localStorage.setItem('ordenes', JSON.stringify(ordenes));
     localStorage.setItem('ultimaOrden', JSON.stringify(orden));
     
-    enviarOrdenPorWhatsApp(orden);
     navigate('/orden-confirmada');
   };
 
@@ -230,12 +222,12 @@ const ProductDetails = () => {
       </div>
 
       <Row className="g-4 g-lg-5">
-        {/* Columna imagen */}
+        {/* Columna imágenes múltiples */}
         <Col lg={6}>
           <div className="position-relative">
             <div className="overflow-hidden rounded-4 shadow-sm" style={{ backgroundColor: '#fef6f0' }}>
               <img
-                src={thumbnail}
+                src={currentImage}
                 alt={title}
                 className="img-fluid w-100"
                 style={{ 
@@ -245,7 +237,7 @@ const ProductDetails = () => {
                   minHeight: '300px',
                   transition: '0.3s'
                 }}
-                onError={(e) => (e.target.src = '/images/placeholder.jpg')}
+                onError={(e) => (e.target.src = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600')}
               />
             </div>
             
@@ -268,17 +260,18 @@ const ProductDetails = () => {
             </div>
           </div>
           
+          {/* Miniaturas dinámicas para los distintos ángulos */}
           <div className="d-flex gap-2 mt-3 justify-content-center flex-wrap">
-            {[thumbnail, thumbnail, thumbnail].map((img, idx) => (
+            {imagesArray.map((img, idx) => (
               <div
                 key={idx}
-                className={`border rounded-3 p-1 ${activeImage === idx ? 'border-warning' : 'border-light'}`}
-                style={{ width: '70px', cursor: 'pointer' }}
+                className={`border rounded-3 p-1 ${activeImage === idx ? 'border-warning shadow-sm' : 'border-light'}`}
+                style={{ width: '70px', cursor: 'pointer', backgroundColor: '#fff' }}
                 onClick={() => setActiveImage(idx)}
               >
                 <img 
                   src={img} 
-                  alt="thumb" 
+                  alt={`Ángulo ${idx + 1}`} 
                   className="w-100 rounded-2" 
                   style={{ height: '60px', objectFit: 'cover' }} 
                 />

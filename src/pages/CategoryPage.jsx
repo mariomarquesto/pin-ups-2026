@@ -1,8 +1,7 @@
-// src/pages/CategoryPage.jsx
 import { useState, useEffect } from "react";
 import { Container } from "react-bootstrap";
 import { useParams, Link } from "react-router-dom";
-import productList from "../data/products.json";
+import { supabase } from "../config/supabase";
 
 // Mapeo de nombres de categoría
 const categoryNames = {
@@ -21,19 +20,32 @@ const CategoryPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const filtered = productList.filter(
-      (product) =>
-        product.category === categoryName ||
-        product.category?.toLowerCase() === categoryName ||
-        product.title.toLowerCase().includes(categoryName),
-    );
+    const fetchCategoryProducts = async () => {
+      setLoading(true);
+      try {
+        // Consultamos directo a Supabase filtrando por categoría
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('category', categoryName?.toLowerCase());
 
-    setFilteredProducts(filtered);
+        if (error) throw error;
+        
+        setFilteredProducts(data || []);
+      } catch (err) {
+        console.error("Error al cargar productos de la categoría:", err.message);
+        setFilteredProducts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCategoryProducts();
+
     setCategoryTitle(
       categoryNames[categoryName] ||
         categoryName?.charAt(0).toUpperCase() + categoryName?.slice(1),
     );
-    setLoading(false);
   }, [categoryName]);
 
   if (loading) {
@@ -61,7 +73,7 @@ const CategoryPage = () => {
             {filteredProducts.length} productos encontrados
           </p>
           
-          {/* Botón Volver al inicio - MEJORADO */}
+          {/* Botón Volver al inicio */}
           <Link to="/" className="text-decoration-none">
             <div 
               className="d-inline-flex align-items-center gap-2 px-4 py-2 rounded-pill transition-all"
@@ -95,10 +107,18 @@ const CategoryPage = () => {
         {filteredProducts.length > 0 ? (
           <div className="d-flex flex-wrap justify-content-center gap-4 py-4">
             {filteredProducts.map((item) => {
-              const precioConDescuento =
-                item.price - item.price * item.discountPercentage * 0.01;
-              const tieneDescuento =
-                item.discountPercentage && item.discountPercentage > 0;
+              // Manejo de imágenes de Supabase (item.images es un array)
+              const imageUrl = Array.isArray(item.images) && item.images.length > 0 
+                ? item.images[0] 
+                : (item.images || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600');
+
+              const precioOriginal = item.price || 0;
+              // Si tenés columna de descuento podés usarla, sino muestra el precio directo
+              const tieneDescuento = item.discountPercentage && item.discountPercentage > 0;
+              const precioConDescuento = tieneDescuento 
+                ? precioOriginal - precioOriginal * item.discountPercentage * 0.01 
+                : precioOriginal;
+
               const formatearPrecio = (precio) => {
                 return new Intl.NumberFormat("es-AR", {
                   style: "currency",
@@ -113,7 +133,7 @@ const CategoryPage = () => {
                   to={`/productdetails/${item.id}`}
                   key={item.id}
                   className="text-decoration-none product-link"
-                  aria-label={`Ver detalles de ${item.title}`}
+                  aria-label={`Ver detalles de ${item.name}`}
                 >
                   <div
                     className="product-card h-100 border-0 shadow-sm"
@@ -132,8 +152,8 @@ const CategoryPage = () => {
                         </span>
                       )}
                       <img
-                        src={item.thumbnail}
-                        alt={item.title}
+                        src={imageUrl}
+                        alt={item.name}
                         style={{
                           width: "100%",
                           height: "220px",
@@ -142,13 +162,13 @@ const CategoryPage = () => {
                         }}
                         loading="lazy"
                         onError={(e) => {
-                          e.target.src = "/images/placeholder.jpg";
+                          e.target.src = "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600";
                         }}
                       />
                     </div>
 
                     <div className="p-3">
-                      <p className="text-muted small mb-1">{item.brand}</p>
+                      <p className="text-muted small mb-1">{item.brand || "Pin Ups"}</p>
                       <h6
                         className="fw-bold text-dark mb-2"
                         style={{
@@ -157,7 +177,7 @@ const CategoryPage = () => {
                           overflow: "hidden",
                         }}
                       >
-                        {item.title}
+                        {item.name}
                       </h6>
 
                       {item.rating && (
@@ -178,7 +198,7 @@ const CategoryPage = () => {
                         </span>
                         {tieneDescuento && (
                           <span className="text-decoration-line-through text-secondary small">
-                            {formatearPrecio(item.price)}
+                            {formatearPrecio(precioOriginal)}
                           </span>
                         )}
                       </div>
