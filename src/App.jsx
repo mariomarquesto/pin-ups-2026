@@ -52,7 +52,7 @@ function App() {
           <Route path='/admin' element={<AdminDashboard/>} />
           <Route path='/admin/products' element={<AdminProducts/>} />
           <Route path='/admin/orders' element={<AdminOrders/>} />
-      
+<Route path="/admin/orders" element={<AdminOrders />} />
       </Routes>
       <Footer/>
       <WhatsAppButton/>

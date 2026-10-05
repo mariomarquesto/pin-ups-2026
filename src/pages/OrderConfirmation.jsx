@@ -8,12 +8,14 @@ import {
   FaArrowLeft,
 } from "react-icons/fa";
 import { useEffect, useState } from "react";
+import { supabase } from "../config/supabase";
 
 const OrderConfirmation = () => {
   const navigate = useNavigate();
 
   const [orden, setOrden] = useState(null);
   const [confirmada, setConfirmada] = useState(false);
+  const [loadingSave, setLoadingSave] = useState(false);
 
   useEffect(() => {
     const ultimaOrden = JSON.parse(
@@ -22,6 +24,10 @@ const OrderConfirmation = () => {
 
     if (ultimaOrden) {
       setOrden(ultimaOrden);
+      // Si ya estaba confirmada previamente en esta sesión
+      if (ultimaOrden.estado === "Confirmada" && ultimaOrden.dbSaved) {
+        setConfirmada(true);
+      }
     } else {
       navigate("/");
     }
@@ -35,24 +41,54 @@ const OrderConfirmation = () => {
       maximumFractionDigits: 0,
     }).format(valor || 0);
 
-  const confirmarPedido = () => {
-    const nuevaOrden = {
-      ...orden,
-      numeroOrden: orden.numeroOrden || `PU-${Date.now()}`,
-      fecha: orden.fecha || new Date().toLocaleString("es-AR"),
-      estado: "Confirmada",
-    };
+  const confirmarPedido = async () => {
+    setLoadingSave(true);
+    try {
+      const numeroOrdenFinal = orden.numeroOrden || `PU-${Date.now()}`;
+      const fechaFinal = orden.fecha || new Date().toLocaleString("es-AR");
 
-    localStorage.setItem(
-      "ultimaOrden",
-      JSON.stringify(nuevaOrden)
-    );
+      const nuevaOrden = {
+        ...orden,
+        numeroOrden: numeroOrdenFinal,
+        fecha: fechaFinal,
+        estado: "Confirmada",
+        dbSaved: true
+      };
 
-    // Opcional: limpiar el carrito de compras tras confirmar la orden
-    localStorage.removeItem("cart");
+      // Guardar en Supabase para el panel de administración
+      const payloadSupabase = {
+        numero_orden: numeroOrdenFinal,
+        fecha: fechaFinal,
+        cliente: orden.cliente || {},
+        productos: orden.productos || [orden.producto].filter(Boolean),
+        subtotal: orden.subtotal || orden.total || 0,
+        envio: orden.envio || 0,
+        total: orden.total || 0,
+        observaciones: orden.observaciones || '',
+        estado: 'Confirmada'
+      };
 
-    setOrden(nuevaOrden);
-    setConfirmada(true);
+      const { error } = await supabase
+        .from('orders')
+        .insert([payloadSupabase]);
+
+      if (error) {
+        console.error('Error al guardar orden en Supabase:', error.message);
+        alert('Hubo un error al registrar la orden en el servidor, pero se guardó localmente.');
+      } else {
+        console.log('✅ Orden guardada exitosamente en Supabase');
+      }
+
+      localStorage.setItem("ultimaOrden", JSON.stringify(nuevaOrden));
+      localStorage.removeItem("cart"); // Limpiar carrito
+
+      setOrden(nuevaOrden);
+      setConfirmada(true);
+    } catch (err) {
+      console.error('Excepción al confirmar pedido:', err);
+    } finally {
+      setLoadingSave(false);
+    }
   };
 
   const volverAlInicio = () => {
@@ -74,6 +110,9 @@ const OrderConfirmation = () => {
       </Container>
     );
   }
+
+  // Normalizar lista de productos (soporta compra de 1 producto o carrito múltiple)
+  const listaProductos = orden.productos || (orden.producto ? [orden.producto] : []);
 
   return (
     <div
@@ -138,30 +177,34 @@ const OrderConfirmation = () => {
                     <thead className="bg-light">
                       <tr>
                         <th>Producto</th>
-                        <th className="text-center">Cantidad</th>
+                        <th className="text-center">Cant.</th>
                         <th className="text-end">Subtotal</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {orden?.productos?.map((prod, idx) => (
+                      {listaProductos.map((prod, idx) => (
                         <tr key={idx}>
-                          <td>{prod.titulo}</td>
-                          <td className="text-center">{prod.cantidad}</td>
-                          <td className="text-end">{formatear(prod.subtotal)}</td>
+                          <td>{prod.titulo || prod.name}</td>
+                          <td className="text-center">{prod.cantidad || 1}</td>
+                          <td className="text-end">{formatear(prod.subtotal || (prod.price * (prod.quantity || 1)))}</td>
                         </tr>
                       ))}
                     </tbody>
                   </Table>
                 </div>
 
-                <div className="d-flex justify-content-between mb-2">
-                  <span className="text-muted">Subtotal</span>
-                  <span>{formatear(orden?.subtotal)}</span>
-                </div>
-                <div className="d-flex justify-content-between mb-2">
-                  <span className="text-muted">Envío</span>
-                  <span>{orden?.envio === 0 ? "Gratis 🎉" : formatear(orden?.envio)}</span>
-                </div>
+                {orden?.subtotal && (
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Subtotal</span>
+                    <span>{formatear(orden?.subtotal)}</span>
+                  </div>
+                )}
+                {orden?.envio !== undefined && (
+                  <div className="d-flex justify-content-between mb-2">
+                    <span className="text-muted">Envío</span>
+                    <span>{orden?.envio === 0 ? "Gratis 🎉" : formatear(orden?.envio)}</span>
+                  </div>
+                )}
 
                 <hr />
 
@@ -177,19 +220,34 @@ const OrderConfirmation = () => {
               </Card.Body>
             </Card>
 
-           
+            <Card className="shadow-sm border-0 rounded-4 mb-4">
+              <Card.Body>
+                <h5 className="fw-bold mb-3">
+                  Estado del Pedido
+                </h5>
+
+                <div className="mb-2">✅ Orden Generada</div>
+                <div className="mb-2">
+                  {confirmada ? "✅" : "⏳"} Datos Confirmados y Registrados en el Sistema
+                </div>
+                <div className="mb-2">⏳ Pago Pendiente</div>
+                <div className="mb-2">⏳ Preparando Pedido</div>
+                <div>⏳ Pedido Entregado</div>
+              </Card.Body>
+            </Card>
 
             <div className="d-flex gap-3 justify-content-center flex-wrap">
               {!confirmada && (
                 <Button
                   onClick={confirmarPedido}
+                  disabled={loadingSave}
                   size="lg"
                   style={{
                     backgroundColor: "#f85606",
                     borderColor: "#f85606",
                   }}
                 >
-                  Confirmar Pedido
+                  {loadingSave ? "Guardando..." : "Confirmar Pedido"}
                 </Button>
               )}
 
@@ -199,7 +257,7 @@ const OrderConfirmation = () => {
                   variant="success"
                   size="lg"
                 >
-                  ✅ Pedido Confirmado Correctamente
+                  ✅ Pedido Confirmado y Guardado en Base de Datos
                 </Button>
               )}
 
