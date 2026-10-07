@@ -1,19 +1,59 @@
 import { Card, Container, Row, Col, Form, Button, InputGroup } from "react-bootstrap";
 import { useState } from 'react';
 import { Link, useNavigate } from "react-router-dom";
-import { FaEnvelope, FaLock, FaSignInAlt, FaEye, FaEyeSlash } from "react-icons/fa";
+import { FaLock, FaSignInAlt, FaEye, FaEyeSlash, FaGoogle } from "react-icons/fa";
 import { MdEmail, MdLockOutline } from "react-icons/md";
+import { supabase } from "../config/supabase";
 
 const Login = () => {
   const navigate = useNavigate();
   const [validated, setValidated] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [input, setInput] = useState({
     email: "",
     password: "",
   });
 
-  const handleLogin = (e) => {
+  // Función para consultar el rol en la tabla profiles y redirigir
+  const redirectBasedOnRole = async (user) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role, nombre')
+        .eq('id', user.id)
+        .single();
+
+      if (error || !profile) {
+        navigate("/");
+        return;
+      }
+
+      // Guardamos la sesión actual en el localStorage para las rutas protegidas
+      const currentUser = {
+        id: user.id,
+        email: user.email,
+        nombre: profile.nombre || "Usuario",
+        role: profile.role // 'admin', 'empleado', 'client'
+      };
+      localStorage.setItem("currentUser", JSON.stringify(currentUser));
+
+      // Redirección según el rol obtenido de Supabase
+      if (profile.role === 'admin' || profile.role === 'empleado') {
+        alert(`🔐 ¡Bienvenido al panel, ${currentUser.nombre}!`);
+        navigate("/admin");
+      } else {
+        alert(`🎉 ¡Bienvenida a Pin Ups, ${currentUser.nombre}!`);
+        navigate("/");
+      }
+    } catch (err) {
+      console.error("Error al obtener el rol:", err);
+      navigate("/");
+    }
+  };
+
+  // Inicio de sesión con Email y Contraseña (Supabase Auth)
+  const handleLogin = async (e) => {
     e.preventDefault();
     const form = e.currentTarget;
     
@@ -23,21 +63,37 @@ const Login = () => {
       return;
     }
 
-    const loggedUser = JSON.parse(localStorage.getItem("users"));
-    
-    if (!loggedUser) {
-      alert("📝 No tenés una cuenta registrada. Registrate primero.");
-      navigate("/register");
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: input.email.trim(),
+      password: input.password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert("❌ Error al iniciar sesión: " + error.message);
       return;
     }
 
-    if (input.email === loggedUser.email && input.password === loggedUser.password) {
-      localStorage.setItem("loggedIn", JSON.stringify(true));
-      localStorage.setItem("currentUser", JSON.stringify(loggedUser));
-      alert("🎉 ¡Bienvenida a Pin Ups! Inicio de sesión exitoso.");
-      navigate("/");
-    } else {
-      alert("❌ Email o contraseña incorrectos. Por favor, verificá tus datos.");
+    if (data?.user) {
+      await redirectBasedOnRole(data.user);
+    }
+  };
+
+  // Inicio de sesión con Google OAuth (Supabase Auth)
+  const handleGoogleLogin = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (error) {
+      alert("❌ No se pudo iniciar sesión con Google: " + error.message);
     }
   };
 
@@ -61,6 +117,23 @@ const Login = () => {
             </div>
 
             <Card.Body className="p-4 p-md-5">
+              {/* Botón de Google OAuth */}
+              <div className="d-grid mb-3">
+                <Button 
+                  variant="outline-dark" 
+                  onClick={handleGoogleLogin}
+                  className="py-2 rounded-pill fw-semibold d-flex align-items-center justify-content-center gap-2 shadow-sm"
+                >
+                  <FaGoogle className="text-danger" /> Continuar con Google
+                </Button>
+              </div>
+
+              <div className="d-flex align-items-center my-3">
+                <hr className="flex-grow-1 text-muted" />
+                <span className="px-2 small text-muted">o con tu email</span>
+                <hr className="flex-grow-1 text-muted" />
+              </div>
+
               <Form noValidate validated={validated} onSubmit={handleLogin}>
                 {/* Email */}
                 <Form.Group className="mb-4">
@@ -69,7 +142,7 @@ const Login = () => {
                   </Form.Label>
                   <InputGroup hasValidation>
                     <InputGroup.Text className="bg-light border-end-0 rounded-3">
-                      <FaEnvelope className="text-muted" />
+                      <MdEmail className="text-muted" />
                     </InputGroup.Text>
                     <Form.Control
                       required
@@ -117,21 +190,17 @@ const Login = () => {
                       Por favor, ingresá tu contraseña.
                     </Form.Control.Feedback>
                   </InputGroup>
-                  <div className="text-end mt-1">
-                    <a href="#" className="small text-decoration-none" style={{ color: '#f85606' }}>
-                      ¿Olvidaste tu contraseña?
-                    </a>
-                  </div>
                 </Form.Group>
 
-                {/* Botón de login */}
+                {/* Botón de login tradicional */}
                 <div className="d-grid gap-2 mb-3">
                   <Button 
                     type="submit" 
+                    disabled={loading}
                     className="py-2 rounded-pill fw-semibold border-0"
                     style={{ backgroundColor: '#f85606', color: 'white' }}
                   >
-                    Ingresar 💖
+                    {loading ? "Verificando..." : "Ingresar 💖"}
                   </Button>
                 </div>
 
@@ -147,11 +216,6 @@ const Login = () => {
               </Form>
             </Card.Body>
           </Card>
-          
-          {/* Mensaje motivacional */}
-          <p className="text-center text-muted small mt-4">
-            👗 Moda para talles reales • Curvy friendly • Envíos a todo el país
-          </p>
         </Col>
       </Row>
     </Container>

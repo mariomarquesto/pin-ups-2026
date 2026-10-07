@@ -1,226 +1,287 @@
-// src/pages/admin/AdminOrders.jsx
-import { useState, useEffect } from 'react';
-import { Container, Table, Button, Spinner, Alert, Badge, Modal } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
-import { supabase } from '../../config/supabase';
-import { FaArrowLeft, FaEye, FaTrash } from 'react-icons/fa';
+import { useEffect, useState } from "react";
+import { Container, Row, Col, Card, Badge, Table, Button, Spinner, Form } from "react-bootstrap";
+import { FaShoppingBag, FaArrowLeft, FaSyncAlt, FaEye } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "../../config/supabase";
 
-const formatearPrecio = (precio) => {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(precio || 0);
+const BRAND = "#f85606";
+const BRAND_DARK = "#e04a00";
+const CREAM = "#fef6f0";
+
+const ESTADOS = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
+
+const estadoVariant = (estado) => {
+  switch (estado) {
+    case "pagado":
+    case "entregado":
+      return "success";
+    case "enviado":
+      return "info";
+    case "cancelado":
+      return "danger";
+    default:
+      return "warning";
+  }
+};
+
+// Fecha legible: usa la fecha de la orden y, si no existe, la de creación.
+const formatearFecha = (orden) => {
+  const cruda = orden?.fecha || orden?.created_at;
+  if (!cruda) return "Sin fecha";
+  const d = new Date(cruda);
+  if (Number.isNaN(d.getTime())) return String(cruda);
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const nombreCliente = (orden) => {
+  const c = orden?.cliente || {};
+  return c.nombre || c.email || orden?.customer_email || "Sin nombre";
 };
 
 const AdminOrders = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  
-  // Estado para el modal de detalles de la orden
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [showModal, setShowModal] = useState(false);
+  const [expanded, setExpanded] = useState(null);
 
-  // Cargar órdenes desde Supabase
-  const fetchOrders = async () => {
+  const loadOrders = async () => {
     setLoading(true);
+    const merged = [];
+
+    // 1. Pedidos guardados en Supabase (fuente compartida entre dispositivos)
     try {
       const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setOrders(data || []);
-    } catch (err) {
-      console.error('Error al cargar órdenes:', err.message);
-      setErrorMsg('No se pudieron cargar las órdenes desde el servidor.');
-    } finally {
-      setLoading(false);
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (!error && Array.isArray(data)) merged.push(...data);
+    } catch {
+      /* sin conexión a Supabase: seguimos con lo local */
     }
+
+    // 2. Pedidos locales (legacy) que no estén ya en Supabase
+    try {
+      const legacy = JSON.parse(localStorage.getItem("ordenes")) || [];
+      if (Array.isArray(legacy)) {
+        legacy.forEach((o) => {
+          const ya = merged.some(
+            (m) => m.numero_orden && m.numero_orden === o.numeroOrden
+          );
+          if (!ya) merged.push(o);
+        });
+      }
+    } catch {
+      /* localStorage corrupto: se ignora */
+    }
+
+    setOrders(merged);
+    setLoading(false);
   };
 
   useEffect(() => {
-    fetchOrders();
+    loadOrders();
   }, []);
 
-  const handleViewDetails = (order) => {
-    setSelectedOrder(order);
-    setShowModal(true);
-  };
+  const handleEstado = async (index, nuevoEstado) => {
+    const target = orders[index];
+    const updated = orders.map((o, i) => (i === index ? { ...o, estado: nuevoEstado } : o));
+    setOrders(updated);
 
-  const handleDeleteOrder = async (id) => {
-    if (!window.confirm('¿Estás segura de que querés eliminar este registro de orden?')) return;
+    // Persistir en Supabase si el pedido existe allá
+    if (target?.id) {
+      try {
+        await supabase.from("orders").update({ estado: nuevoEstado }).eq("id", target.id);
+      } catch {
+        /* sin conexión: queda solo en memoria/local */
+      }
+    }
 
+    // Reflejar también en el listado local legacy
     try {
-      const { error } = await supabase.from('orders').delete().eq('id', id);
-      if (error) throw error;
-      
-      setSuccessMsg('Orden eliminada correctamente.');
-      fetchOrders();
-    } catch (err) {
-      console.error('Error al eliminar orden:', err.message);
-      setErrorMsg('No se pudo eliminar la orden.');
+      const legacy = JSON.parse(localStorage.getItem("ordenes")) || [];
+      if (Array.isArray(legacy)) {
+        const next = legacy.map((o) =>
+          o.numeroOrden && o.numeroOrden === (target?.numeroOrden || target?.numero_orden)
+            ? { ...o, estado: nuevoEstado }
+            : o
+        );
+        localStorage.setItem("ordenes", JSON.stringify(next));
+      }
+    } catch {
+      /* almacenamiento lleno: se ignora */
     }
   };
 
   return (
-    <Container className="py-5">
-      <div className="mb-4">
-        <Link to="/admin" className="text-decoration-none text-muted d-flex align-items-center gap-1 mb-2">
-          <FaArrowLeft size={14} /> Volver al Panel
-        </Link>
-        <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-          <div>
-            <h1 className="fw-bold text-dark mb-1">Gestión de Órdenes y Pedidos</h1>
-            <p className="text-muted mb-0">Revisá los pedidos confirmados por los clientes en la tienda.</p>
-          </div>
-        </div>
-      </div>
-
-      {errorMsg && <Alert variant="danger" onClose={() => setErrorMsg('')} dismissible>{errorMsg}</Alert>}
-      {successMsg && <Alert variant="success" onClose={() => setSuccessMsg('')} dismissible>{successMsg}</Alert>}
+    <Container fluid className="px-4 pb-5" style={{ backgroundColor: CREAM, minHeight: "100vh" }}>
+      <Row className="align-items-center mb-4">
+        <Col>
+          <h2 className="fw-bold d-flex align-items-center gap-2" style={{ color: BRAND_DARK }}>
+            <FaShoppingBag style={{ color: BRAND }} /> Pedidos
+          </h2>
+          <p className="text-muted mb-0">Historial de compras realizadas en la tienda.</p>
+        </Col>
+        <Col xs="auto" className="d-flex gap-2">
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={loadOrders}
+            className="d-flex align-items-center gap-1 rounded-pill"
+          >
+            <FaSyncAlt /> Actualizar
+          </Button>
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            onClick={() => navigate("/admin")}
+            className="d-flex align-items-center gap-1 rounded-pill"
+          >
+            <FaArrowLeft /> Volver
+          </Button>
+        </Col>
+      </Row>
 
       {loading ? (
         <div className="text-center py-5">
-          <Spinner animation="border" variant="dark" />
+          <Spinner animation="border" style={{ color: BRAND }} />
         </div>
+      ) : orders.length === 0 ? (
+        <Card className="shadow-sm text-center py-5 border-0">
+          <Card.Body>
+            <h5 className="fw-bold" style={{ color: BRAND_DARK }}>
+              Todavía no hay pedidos
+            </h5>
+            <p className="text-muted mb-0">Cuando un cliente compre, el pedido va a aparecer acá.</p>
+          </Card.Body>
+        </Card>
       ) : (
-        <div className="bg-white shadow-sm rounded-4 overflow-hidden border border-light">
-          <div className="table-responsive">
-            <Table hover align="middle" className="mb-0">
-              <thead className="table-light text-uppercase fs-7 text-muted">
-                <tr>
-                  <th className="py-3 px-4">N° Orden</th>
-                  <th className="py-3 px-4">Fecha</th>
-                  <th className="py-3 px-4">Cliente</th>
-                  <th className="py-3 px-4">Total</th>
-                  <th className="py-3 px-4">Estado</th>
-                  <th className="py-3 px-4 text-end">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="text-center py-5 text-muted">
-                      No hay órdenes registradas todavía.
-                    </td>
-                  </tr>
-                ) : (
-                  orders.map((order) => {
-                    const cliente = order.cliente || {};
-                    return (
-                      <tr key={order.id}>
-                        <td className="px-4 fw-bold text-dark">{order.numero_orden}</td>
-                        <td className="px-4 text-muted small">{order.fecha}</td>
-                        <td className="px-4">
-                          <div className="fw-semibold text-dark">{cliente.nombre || 'Sin nombre'}</div>
-                          <div className="small text-muted">{cliente.telefono || 'Sin teléfono'}</div>
-                        </td>
-                        <td className="px-4 fw-bold text-success">{formatearPrecio(order.total)}</td>
-                        <td className="px-4">
-                          <Badge bg="success" className="px-2 py-1">
-                            {order.estado || 'Confirmada'}
-                          </Badge>
-                        </td>
-                        <td className="px-4 text-end">
-                          <div className="d-flex justify-content-end gap-2">
-                            <Button 
-                              variant="outline-primary" 
-                              size="sm" 
-                              className="rounded-circle p-2"
-                              onClick={() => handleViewDetails(order)}
-                              title="Ver detalles del pedido"
-                            >
-                              <FaEye size={14} />
-                            </Button>
-                            <Button 
-                              variant="outline-danger" 
-                              size="sm" 
-                              className="rounded-circle p-2"
-                              onClick={() => handleDeleteOrder(order.id)}
-                              title="Eliminar orden"
-                            >
-                              <FaTrash size={14} />
-                            </Button>
+        <Row>
+          {orders.map((orden, index) => (
+            <Col key={orden.numero_orden || orden.numeroOrden || orden.id || index} xs={12} className="mb-3">
+              <Card className="shadow-sm border-0">
+                <Card.Body>
+                  <Row className="align-items-center g-2">
+                    <Col md={3}>
+                      <div className="fw-bold" style={{ color: BRAND_DARK }}>
+                        #{orden.numero_orden || orden.numeroOrden || index + 1}
+                      </div>
+                      <div className="text-muted small">{formatearFecha(orden)}</div>
+                    </Col>
+
+                    <Col md={3}>
+                      <div className="fw-semibold">{nombreCliente(orden)}</div>
+                      <div className="text-muted small">
+                        {orden.cliente?.email || orden.customer_email || "Sin email"}
+                      </div>
+                    </Col>
+
+                    <Col md={2}>
+                      <Badge bg={estadoVariant(orden.estado)} className="text-uppercase">
+                        {orden.estado || "pendiente"}
+                      </Badge>
+                    </Col>
+
+                    <Col md={2} className="fw-bold text-end" style={{ color: BRAND_DARK }}>
+                      ${(orden.total || 0).toLocaleString("es-AR")}
+                    </Col>
+
+                    <Col md={2} className="text-end">
+                      <Button
+                        variant="outline-secondary"
+                        size="sm"
+                        className="rounded-pill d-inline-flex align-items-center gap-1"
+                        onClick={() => setExpanded(expanded === index ? null : index)}
+                      >
+                        <FaEye /> {expanded === index ? "Ocultar" : "Ver"}
+                      </Button>
+                    </Col>
+                  </Row>
+
+                  {expanded === index && (
+                    <>
+                      <hr />
+                      <Row className="g-3">
+                        <Col md={6}>
+                          <h6 className="fw-bold" style={{ color: BRAND_DARK }}>
+                            Cliente
+                          </h6>
+                          <div className="text-muted small">
+                            <div>Nombre: {nombreCliente(orden)}</div>
+                            <div>Email: {orden.cliente?.email || orden.customer_email || "Sin email"}</div>
+                            <div>Teléfono: {orden.cliente?.telefono || "Sin teléfono"}</div>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </Table>
-          </div>
-        </div>
+                        </Col>
+
+                        <Col md={6}>
+                          <h6 className="fw-bold" style={{ color: BRAND_DARK }}>
+                            Estado del pedido
+                          </h6>
+                          <Form.Select
+                            size="sm"
+                            value={orden.estado || "pendiente"}
+                            onChange={(e) => handleEstado(index, e.target.value)}
+                          >
+                            {ESTADOS.map((e) => (
+                              <option key={e} value={e}>
+                                {e}
+                              </option>
+                            ))}
+                          </Form.Select>
+                        </Col>
+
+                        <Col xs={12}>
+                          <h6 className="fw-bold" style={{ color: BRAND_DARK }}>
+                            Productos
+                          </h6>
+                          <Table size="sm" responsive className="align-middle mb-0">
+                            <thead className="table-light">
+                              <tr>
+                                <th>Producto</th>
+                                <th className="text-center">Cant.</th>
+                                <th className="text-end">P. Unit.</th>
+                                <th className="text-end">Subtotal</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(Array.isArray(orden.productos) ? orden.productos : [orden.producto])
+                                .filter(Boolean)
+                                .map((p, pi) => (
+                                  <tr key={pi}>
+                                    <td>{p.titulo || p.nombre || "Producto"}</td>
+                                    <td className="text-center">{p.cantidad || 1}</td>
+                                    <td className="text-end">
+                                      ${(p.precioUnitario || 0).toLocaleString("es-AR")}
+                                    </td>
+                                    <td className="text-end">${(p.subtotal || 0).toLocaleString("es-AR")}</td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </Table>
+                        </Col>
+
+                        {orden.observaciones && (
+                          <Col xs={12}>
+                            <h6 className="fw-bold" style={{ color: BRAND_DARK }}>
+                              Observaciones
+                            </h6>
+                            <p className="text-muted small mb-0">{orden.observaciones}</p>
+                          </Col>
+                        )}
+                      </Row>
+                    </>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          ))}
+        </Row>
       )}
-
-      {/* Modal para ver detalles completos de la orden */}
-      <Modal show={showModal} onHide={() => setShowModal(false)} centered size="lg">
-        <Modal.Header closeButton className="border-0 pb-0">
-          <Modal.Title className="fw-bold">
-            Detalles de la Orden: {selectedOrder?.numero_orden}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body className="pt-3">
-          {selectedOrder && (
-            <div>
-              <p className="text-muted small mb-3">Fecha del pedido: {selectedOrder.fecha}</p>
-              
-              <h5 className="fw-bold text-dark mb-2">Datos del Cliente</h5>
-              <div className="bg-light p-3 rounded-3 mb-3">
-                <p className="mb-1"><strong>Nombre:</strong> {selectedOrder.cliente?.nombre}</p>
-                <p className="mb-1"><strong>Email:</strong> {selectedOrder.cliente?.email}</p>
-                <p className="mb-0"><strong>Teléfono:</strong> {selectedOrder.cliente?.telefono}</p>
-              </div>
-
-              <h5 className="fw-bold text-dark mb-2">Productos Comprados</h5>
-              <div className="table-responsive mb-3">
-                <Table size="sm" className="align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Producto</th>
-                      <th className="text-center">Cant.</th>
-                      <th className="text-end">Subtotal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedOrder.productos?.map((prod, idx) => (
-                      <tr key={idx}>
-                        <td>{prod.titulo || prod.name}</td>
-                        <td className="text-center">{prod.cantidad || 1}</td>
-                        <td className="text-end">{formatearPrecio(prod.subtotal || (prod.price * (prod.quantity || 1)))}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
-
-              <div className="d-flex justify-content-between mb-1">
-                <span>Subtotal:</span>
-                <span>{formatearPrecio(selectedOrder.subtotal)}</span>
-              </div>
-              <div className="d-flex justify-content-between mb-2">
-                <span>Envío:</span>
-                <span>{selectedOrder.envio === 0 ? "Gratis" : formatearPrecio(selectedOrder.envio)}</span>
-              </div>
-              <hr />
-              <div className="d-flex justify-content-between align-items-center">
-                <h5 className="fw-bold mb-0">Total Final:</h5>
-                <h5 className="fw-bold mb-0 text-success">{formatearPrecio(selectedOrder.total)}</h5>
-              </div>
-            </div>
-          )}
-        </Modal.Body>
-        <Modal.Footer className="border-0 pt-0">
-          <Button variant="dark" className="px-4" onClick={() => setShowModal(false)}>
-            Cerrar
-          </Button>
-        </Modal.Footer>
-      </Modal>
     </Container>
   );
 };

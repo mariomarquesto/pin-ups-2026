@@ -8,10 +8,11 @@ import { PiKeyReturnFill } from 'react-icons/pi';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../config/supabase';
 import productList from '../data/products.json';
+import { isLoggedIn as isSessionActive, getSessionUser } from '../utils/session';
 import './ProductDetails.css';
 
 const ProductDetails = () => {
-  const isLoggedIn = JSON.parse(localStorage.getItem('loggedIn'));
+  const loggedIn = isSessionActive();
   const navigate = useNavigate();
   const { id } = useParams();
 
@@ -146,7 +147,7 @@ const ProductDetails = () => {
   };
 
   const handleAddToCart = () => {
-    if (!isLoggedIn) {
+    if (!loggedIn) {
       alert('💄 Iniciá sesión para agregar productos');
       navigate('/login');
       return;
@@ -160,18 +161,19 @@ const ProductDetails = () => {
   };
 
   const handleBuyNow = () => {
-    if (!isLoggedIn) {
+    if (!loggedIn) {
       alert('💄 Iniciá sesión para realizar la compra');
       navigate('/login');
       return;
     }
 
-    const user = JSON.parse(localStorage.getItem('users'));
-    const telefonoUsuario = user?.phone || 'No especificado';
-    const emailUsuario = user?.email || 'No especificado';
-    const nombreUsuario = user?.fName && user?.lName 
-      ? `${user.fName} ${user.lName}` 
-      : user?.fName || 'Cliente Pin Ups';
+    const user = getSessionUser() || {};
+    const telefonoUsuario = user.phone || user.telefono || 'No especificado';
+    const emailUsuario = user.email || 'No especificado';
+    const nombreUsuario =
+      user.nombre ||
+      (user.fName && user.lName ? `${user.fName} ${user.lName}` : user.fName) ||
+      'Cliente Pin Ups';
 
     const precioUnitario = precioFinal;
     const subtotal = precioUnitario * count;

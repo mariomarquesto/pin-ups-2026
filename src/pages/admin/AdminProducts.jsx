@@ -2,7 +2,12 @@ import { useState, useEffect } from 'react';
 import { Container, Table, Button, Modal, Form, Spinner, Alert, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
-import { FaArrowLeft, FaPlus, FaTrash, FaEdit, FaUpload } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaTrash, FaEdit } from 'react-icons/fa';
+
+// Paleta de marca Pin Ups
+const BRAND = '#f85606';
+const BRAND_DARK = '#e04a00';
+const CREAM = '#fef6f0';
 
 // Mapeo de nombres de categoría
 const categoryNames = {
@@ -189,19 +194,19 @@ const AdminProducts = () => {
   };
 
   return (
-    <Container className="py-5">
+    <Container className="py-5" style={{ backgroundColor: CREAM, minHeight: '100vh' }}>
       <div className="mb-4">
-        <Link to="/admin" className="text-decoration-none text-muted d-flex align-items-center gap-1 mb-2">
+        <Link to="/admin" className="text-decoration-none d-flex align-items-center gap-1 mb-2" style={{ color: BRAND_DARK }}>
           <FaArrowLeft size={14} /> Volver al Panel
         </Link>
         <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
           <div>
-            <h1 className="fw-bold text-dark mb-1">Administración de Prendas</h1>
+            <h1 className="fw-bold mb-1" style={{ color: BRAND_DARK }}>Administración de Prendas</h1>
             <p className="text-muted mb-0">Controlá el catálogo, precios y stock de tu indumentaria.</p>
           </div>
           <Button 
-            variant="dark" 
-            className="d-flex align-items-center gap-2 px-4 py-2 shadow-sm"
+            className="d-flex align-items-center gap-2 px-4 py-2 shadow-sm rounded-pill"
+            style={{ backgroundColor: BRAND, borderColor: BRAND }}
             onClick={handleOpenCreate}
           >
             <FaPlus /> Nueva Prenda
@@ -214,7 +219,7 @@ const AdminProducts = () => {
 
       {loading ? (
         <div className="text-center py-5">
-          <Spinner animation="border" variant="dark" />
+          <Spinner animation="border" style={{ color: BRAND }} />
         </div>
       ) : (
         <div className="bg-white shadow-sm rounded-4 overflow-hidden border border-light">
@@ -257,7 +262,7 @@ const AdminProducts = () => {
                             {categoryDisplayName}
                           </Badge>
                         </td>
-                        <td className="px-4 fw-semibold text-success">{formatearPrecio(product.price)}</td>
+                        <td className="px-4 fw-semibold" style={{ color: BRAND_DARK }}>{formatearPrecio(product.price)}</td>
                         <td className="px-4">
                           <span className={`fw-bold ${product.stock <= 3 ? 'text-danger' : 'text-secondary'}`}>
                             {product.stock ?? 0} u.
@@ -266,9 +271,10 @@ const AdminProducts = () => {
                         <td className="px-4 text-end">
                           <div className="d-flex justify-content-end gap-2">
                             <Button 
-                              variant="outline-primary" 
+                              variant="outline-secondary" 
                               size="sm" 
                               className="rounded-circle p-2"
+                              style={{ color: BRAND, borderColor: BRAND }}
                               onClick={() => handleOpenEdit(product)}
                               title="Editar prenda"
                             >
@@ -420,7 +426,7 @@ const AdminProducts = () => {
             <Button variant="outline-secondary" className="px-4" onClick={() => setIsOpenModal(false)} disabled={uploadingImage}>
               Cancelar
             </Button>
-            <Button variant="dark" type="submit" className="px-4" disabled={uploadingImage}>
+            <Button type="submit" className="px-4" disabled={uploadingImage} style={{ backgroundColor: BRAND, borderColor: BRAND }}>
               {uploadingImage ? (
                 <>
                   <Spinner animation="border" size="sm" className="me-2" />

@@ -1,13 +1,14 @@
-// src/services/SecureAdminRoute.jsx
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
+import { getSessionUser } from '../utils/session';
 
-const SecureAdminRoute = () => {
-  // Aquí obtienes el usuario o token (desde localStorage, Context o Zustand/Redux)
-  const user = JSON.parse(localStorage.getItem('user')) || null;
-  const isAdmin = user && user.role === 'admin'; 
+const SecureAdminRoute = ({ children }) => {
+  // Leemos el usuario logueado de forma segura (acepta currentUser / users)
+  const user = getSessionUser();
 
-  // Si es admin, muestra las rutas hijas; si no, redirige al home o login
-  return isAdmin ? <Outlet /> : <Navigate to="/login" replace />;
+  // Solo pueden entrar admin o empleado
+  const hasPermission = user && (user.role === 'admin' || user.role === 'empleado');
+
+  return hasPermission ? children : <Navigate to="/login" replace />;
 };
 
 export default SecureAdminRoute;

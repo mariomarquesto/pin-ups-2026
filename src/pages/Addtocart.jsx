@@ -3,10 +3,11 @@ import { useEffect, useState, useCallback } from "react";
 import { Button, Card, Container, Row, Col, Image } from "react-bootstrap";
 import { FaTrashAlt, FaPlus, FaMinus, FaShoppingCart } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
+import { isLoggedIn, getSessionUser } from "../utils/session";
 
 const Addtocart = () => {
   const navigate = useNavigate();
-  const isLoggedIn = JSON.parse(localStorage.getItem('loggedIn'));
+  const loggedIn = isLoggedIn();
 
   const [cart, setCart] = useState([]);
   const [total, setTotal] = useState(0);
@@ -111,18 +112,19 @@ const Addtocart = () => {
   };
 
   const handleCheckout = () => {
-    if (!isLoggedIn) {
+    if (!loggedIn) {
       alert('💄 Iniciá sesión para finalizar tu compra');
       navigate('/login');
       return;
     }
 
-    const user = JSON.parse(localStorage.getItem('users'));
-    const telefonoUsuario = user?.phone || 'No especificado';
-    const emailUsuario = user?.email || 'No especificado';
-    const nombreUsuario = user?.fName && user?.lName 
-      ? `${user.fName} ${user.lName}` 
-      : user?.fName || 'Cliente Pin Ups';
+    const user = getSessionUser() || {};
+    const telefonoUsuario = user.phone || user.telefono || "No especificado";
+    const emailUsuario = user.email || "No especificado";
+    const nombreUsuario =
+      user.nombre ||
+      (user.fName && user.lName ? `${user.fName} ${user.lName}` : user.fName) ||
+      "Cliente Pin Ups";
 
     const productosOrden = cart.map(item => {
       const discount = item.discountPercentage || item.discount_percentage || 0;

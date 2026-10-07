@@ -12,7 +12,7 @@ const Home = () => {
   useEffect(() => {
     const fetchBanner = async () => {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('site_config')
           .select('banner_image_url')
           .eq('id', 1)
