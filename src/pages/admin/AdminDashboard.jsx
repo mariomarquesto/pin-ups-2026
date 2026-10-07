@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Container, Row, Col, Card, Badge, Button, Spinner } from "react-bootstrap";
-import { FaBox, FaShoppingBag, FaChartLine, FaPlus } from "react-icons/fa";
+import { FaBox, FaShoppingBag, FaChartLine, FaUsers, FaPlus } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../config/supabase";
 import { getSessionUser } from "../../utils/session";
@@ -64,6 +64,12 @@ const AdminDashboard = () => {
 
   const pendientes = orders.filter((o) => (o.estado || "pendiente") === "pendiente").length;
 
+  const clientesUnicos = new Set(
+    orders
+      .map((o) => (o.cliente?.email || o.customer_email || o.cliente?.nombre || "").trim().toLowerCase())
+      .filter(Boolean)
+  ).size;
+
   return (
     <Container fluid className="px-4 pb-5" style={{ backgroundColor: CREAM, minHeight: "100vh" }}>
       <Row className="align-items-center mb-4">
@@ -93,7 +99,7 @@ const AdminDashboard = () => {
         </div>
       ) : (
         <Row className="g-4">
-          <Col md={4}>
+          <Col md={6} lg={3}>
             <StatCard
               icon={FaBox}
               label="Productos"
@@ -101,7 +107,7 @@ const AdminDashboard = () => {
               onClick={() => navigate("/admin/products")}
             />
           </Col>
-          <Col md={4}>
+          <Col md={6} lg={3}>
             <StatCard
               icon={FaShoppingBag}
               label="Pedidos"
@@ -109,12 +115,20 @@ const AdminDashboard = () => {
               onClick={() => navigate("/admin/orders")}
             />
           </Col>
-          <Col md={4}>
+          <Col md={6} lg={3}>
             <StatCard
               icon={FaChartLine}
               label="Pedidos pendientes"
               value={pendientes}
               onClick={() => navigate("/admin/orders")}
+            />
+          </Col>
+          <Col md={6} lg={3}>
+            <StatCard
+              icon={FaUsers}
+              label="Clientas (CRM)"
+              value={clientesUnicos}
+              onClick={() => navigate("/admin/crm")}
             />
           </Col>
         </Row>

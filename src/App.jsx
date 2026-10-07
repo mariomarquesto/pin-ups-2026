@@ -23,6 +23,7 @@ import SecureAdminRoute from './services/SecureAdminRoute.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import AdminProducts from './pages/admin/AdminProducts.jsx';
 import AdminOrders from './pages/admin/AdminOrders.jsx';
+import AdminCRM from './pages/admin/AdminCRM.jsx';
 
 import './App.css';
 
@@ -73,6 +74,12 @@ function App() {
         <Route path='/admin/orders' element={
           <SecureAdminRoute allowedRoles={['admin', 'empleado']}>
             <AdminOrders/>
+          </SecureAdminRoute>
+        } />
+
+        <Route path='/admin/crm' element={
+          <SecureAdminRoute allowedRoles={['admin', 'empleado']}>
+            <AdminCRM/>
           </SecureAdminRoute>
         } />
       </Routes>

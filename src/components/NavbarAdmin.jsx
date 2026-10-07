@@ -1,6 +1,6 @@
 import { Navbar, Container, Nav, Button } from "react-bootstrap";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { FaBox, FaShoppingBag, FaChartLine, FaSignOutAlt } from "react-icons/fa";
+import { FaBox, FaShoppingBag, FaChartLine, FaUsers, FaSignOutAlt } from "react-icons/fa";
 import { supabase } from "../config/supabase";
 import { getSessionUser } from "../utils/session";
 
@@ -55,6 +55,10 @@ const NavbarAdmin = () => {
 
             <Nav.Link as={Link} to="/admin/orders" className={linkClass("/admin/orders")} style={linkStyle("/admin/orders")}>
               <FaShoppingBag className="me-1" /> Pedidos
+            </Nav.Link>
+
+            <Nav.Link as={Link} to="/admin/crm" className={linkClass("/admin/crm")} style={linkStyle("/admin/crm")}>
+              <FaUsers className="me-1" /> CRM
             </Nav.Link>
           </Nav>
 
