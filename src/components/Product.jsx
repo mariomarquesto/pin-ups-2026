@@ -1,50 +1,13 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import Card from 'react-bootstrap/Card';
 import { Link } from 'react-router-dom';
-import { supabase } from '../config/supabase';
+import { useProducts } from '../utils/useProducts';
+import { formatearPrecio, PLACEHOLDER_IMG } from '../utils/helpers';
 import './Product.css';
-import productList from '../data/products.json';
-
-const formatearPrecio = (precio) => {
-  return new Intl.NumberFormat("es-AR", {
-    style: "currency",
-    currency: "ARS",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(precio);
-};
 
 function Product() {
-  const [productos, setProductos] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { productos, loading } = useProducts();
   const cardsRef = useRef([]);
-
-  // Cargar productos desde Supabase (y fallback a JSON)
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (!error && data && data.length > 0) {
-          console.log('✅ Productos cargados desde Supabase:', data.length);
-          setProductos(data);
-        } else {
-          console.log('📦 Usando productos locales (JSON)');
-          setProductos(productList);
-        }
-      } catch (err) {
-        console.error('Error al cargar de Supabase, usando JSON local:', err);
-        setProductos(productList);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchProducts();
-  }, []);
 
   // Efecto cascada con Intersection Observer
   useEffect(() => {
@@ -90,7 +53,7 @@ function Product() {
         const price = item.price || 0;
         
         // Manejo de imágenes (si es array de Supabase usa la primera, si es string usa esa, o un fallback seguro)
-        let imageUrl = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
+        let imageUrl = PLACEHOLDER_IMG;
         if (Array.isArray(item.images) && item.images.length > 0) {
           imageUrl = item.images[0];
         } else if (item.thumbnail) {

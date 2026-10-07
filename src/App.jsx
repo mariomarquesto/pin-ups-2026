@@ -17,6 +17,7 @@ import TermsAndConditions from './pages/TermsAndConditions.jsx';
 import PrivacyPolicy from './pages/PrivacyPolicy.jsx';
 import HelpCenter from './pages/HelpCenter.jsx';
 import OrderConfirmation from './pages/OrderConfirmation.jsx';
+import NotFound from './pages/NotFound.jsx';
 
 // --- IMPORTACIONES DEL PANEL DE ADMIN ---
 import SecureAdminRoute from './services/SecureAdminRoute.jsx';
@@ -82,6 +83,9 @@ function App() {
             <AdminCRM/>
           </SecureAdminRoute>
         } />
+
+        {/* ================= 404 (cualquier otra ruta) ================= */}
+        <Route path='*' element={<NotFound/>} />
       </Routes>
 
       {/* Footer y WhatsApp solo se muestran en la tienda pública, no en admin */}
