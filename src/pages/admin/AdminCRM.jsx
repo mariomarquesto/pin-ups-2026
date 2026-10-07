@@ -11,6 +11,7 @@ import {
   InputGroup,
   Modal,
   Table,
+  Alert,
 } from "react-bootstrap";
 import {
   FaUsers,
@@ -71,6 +72,18 @@ const formatearFechaHora = (cruda) => {
 const money = (n) => `$${Number(n || 0).toLocaleString("es-AR")}`;
 
 const soloDigitos = (s) => (s || "").replace(/\D/g, "");
+
+// Traduce el error de Supabase a un mensaje útil para el admin.
+const mensajeError = (err) => {
+  const msg = err?.message || "";
+  if (/relation|does not exist|42P01|could not find the table|schema cache/i.test(msg)) {
+    return "Falta la tabla `crm_clients` en Supabase. Corré la migración `supabase/crm_clients.sql` una sola vez.";
+  }
+  if (/row-level security|42501|permission/i.test(msg)) {
+    return "Sin permisos para guardar en `crm_clients` (revisá las políticas RLS).";
+  }
+  return msg || "No se pudo guardar en Supabase.";
+};
 
 const segmentar = (cliente) => {
   const pedidos = cliente.pedidos.length;
@@ -196,6 +209,9 @@ const AdminCRM = () => {
 
   const [seleccionado, setSeleccionado] = useState(null);
   const [crmLocal, setCrmLocal] = useState({ tags: [], notas: [] });
+  const [crmLoading, setCrmLoading] = useState(false);
+  const [crmSaving, setCrmSaving] = useState(false);
+  const [crmError, setCrmError] = useState("");
   const [nuevaTag, setNuevaTag] = useState("");
   const [nuevaNota, setNuevaNota] = useState("");
 
@@ -237,11 +253,21 @@ const AdminCRM = () => {
     cargar();
   }, []);
 
-  const abrirDetalle = (cliente) => {
+  const abrirDetalle = async (cliente) => {
     setSeleccionado(cliente);
-    setCrmLocal(getCrmData(cliente));
+    setCrmLocal({ tags: [], notas: [] });
+    setCrmError("");
     setNuevaTag("");
     setNuevaNota("");
+    setCrmLoading(true);
+    try {
+      const data = await getCrmData(cliente);
+      setCrmLocal(data);
+    } catch (err) {
+      setCrmError(mensajeError(err));
+    } finally {
+      setCrmLoading(false);
+    }
   };
 
   const kpis = useMemo(() => {
@@ -286,30 +312,62 @@ const AdminCRM = () => {
     return out;
   }, [clientes, busqueda, filtroSegmento, orden]);
 
-  const handleAddTag = () => {
-    if (!seleccionado || !nuevaTag.trim()) return;
-    const tags = addTag(seleccionado, nuevaTag);
-    setCrmLocal((prev) => ({ ...prev, tags }));
-    setNuevaTag("");
+  const handleAddTag = async () => {
+    if (!seleccionado || !nuevaTag.trim() || crmSaving) return;
+    setCrmSaving(true);
+    setCrmError("");
+    try {
+      const tags = await addTag(seleccionado, nuevaTag, crmLocal.tags);
+      setCrmLocal((prev) => ({ ...prev, tags }));
+      setNuevaTag("");
+    } catch (err) {
+      setCrmError(mensajeError(err));
+    } finally {
+      setCrmSaving(false);
+    }
   };
 
-  const handleRemoveTag = (tag) => {
-    if (!seleccionado) return;
-    const tags = removeTag(seleccionado, tag);
-    setCrmLocal((prev) => ({ ...prev, tags }));
+  const handleRemoveTag = async (tag) => {
+    if (!seleccionado || crmSaving) return;
+    setCrmSaving(true);
+    setCrmError("");
+    try {
+      const tags = await removeTag(seleccionado, tag, crmLocal.tags);
+      setCrmLocal((prev) => ({ ...prev, tags }));
+    } catch (err) {
+      setCrmError(mensajeError(err));
+    } finally {
+      setCrmSaving(false);
+    }
   };
 
-  const handleAddNota = () => {
-    if (!seleccionado || !nuevaNota.trim()) return;
-    const notas = addNota(seleccionado, nuevaNota);
-    setCrmLocal((prev) => ({ ...prev, notas }));
-    setNuevaNota("");
+  const handleAddNota = async () => {
+    if (!seleccionado || !nuevaNota.trim() || crmSaving) return;
+    setCrmSaving(true);
+    setCrmError("");
+    try {
+      const notas = await addNota(seleccionado, nuevaNota, crmLocal.notas);
+      setCrmLocal((prev) => ({ ...prev, notas }));
+      setNuevaNota("");
+    } catch (err) {
+      setCrmError(mensajeError(err));
+    } finally {
+      setCrmSaving(false);
+    }
   };
 
-  const handleRemoveNota = (id) => {
-    if (!seleccionado) return;
-    const notas = removeNota(seleccionado, id);
-    setCrmLocal((prev) => ({ ...prev, notas }));
+  const handleRemoveNota = async (id) => {
+    if (!seleccionado || crmSaving) return;
+    setCrmSaving(true);
+    setCrmError("");
+    try {
+      const notas = await removeNota(seleccionado, id, crmLocal.notas);
+      setCrmLocal((prev) => ({ ...prev, notas }));
+    } catch (err) {
+      setCrmError(mensajeError(err));
+    } finally {
+      setCrmSaving(false);
+    }
   };
 
   const SegBadge = ({ seg }) => {
@@ -503,6 +561,11 @@ const AdminCRM = () => {
               </Modal.Title>
             </Modal.Header>
             <Modal.Body>
+              {crmError && (
+                <Alert variant="warning" className="py-2 small">
+                  {crmError}
+                </Alert>
+              )}
               <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
                 <SegBadge seg={seleccionado.segmento} />
                 {crmLocal.tags.map((t) => (
@@ -619,11 +682,16 @@ const AdminCRM = () => {
                 <Form.Control
                   placeholder="Agregar etiqueta (ej. mayorista, VIP...)"
                   value={nuevaTag}
+                  disabled={crmLoading || crmSaving}
                   onChange={(e) => setNuevaTag(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAddTag()}
                 />
-                <Button style={{ backgroundColor: BRAND, borderColor: BRAND }} onClick={handleAddTag}>
-                  Agregar
+                <Button
+                  style={{ backgroundColor: BRAND, borderColor: BRAND }}
+                  onClick={handleAddTag}
+                  disabled={crmLoading || crmSaving}
+                >
+                  {crmSaving ? <Spinner animation="border" size="sm" /> : "Agregar"}
                 </Button>
               </InputGroup>
 
@@ -636,13 +704,22 @@ const AdminCRM = () => {
                   rows={2}
                   placeholder="Escribí una nota sobre esta clienta..."
                   value={nuevaNota}
+                  disabled={crmLoading || crmSaving}
                   onChange={(e) => setNuevaNota(e.target.value)}
                 />
-                <Button style={{ backgroundColor: BRAND, borderColor: BRAND }} onClick={handleAddNota}>
-                  Guardar
+                <Button
+                  style={{ backgroundColor: BRAND, borderColor: BRAND }}
+                  onClick={handleAddNota}
+                  disabled={crmLoading || crmSaving}
+                >
+                  {crmSaving ? <Spinner animation="border" size="sm" /> : "Guardar"}
                 </Button>
               </InputGroup>
-              {crmLocal.notas.length === 0 ? (
+              {crmLoading ? (
+                <div className="text-center py-2">
+                  <Spinner animation="border" size="sm" style={{ color: BRAND }} />
+                </div>
+              ) : crmLocal.notas.length === 0 ? (
                 <p className="text-muted small mb-0">Sin notas todavía.</p>
               ) : (
                 crmLocal.notas.map((n) => (

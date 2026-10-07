@@ -1,27 +1,8 @@
-// Persistencia local de datos propios del CRM (etiquetas y notas) por cliente.
-// Se indexa por una clave estable (email normalizado o id) para sobrevivir
-// recargas y actualizaciones del listado de pedidos.
-const CRM_KEY = "crm_client_data";
+// Persistencia del CRM (etiquetas y notas) en Supabase, tabla `crm_clients`.
+// Una fila por clienta, indexada por una clave estable (email normalizado o id).
+import { supabase } from "../config/supabase";
 
-const leer = () => {
-  try {
-    const raw = JSON.parse(localStorage.getItem(CRM_KEY));
-    if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
-  } catch {
-    /* localStorage corrupto: se ignora */
-  }
-  return {};
-};
-
-const escribir = (data) => {
-  try {
-    localStorage.setItem(CRM_KEY, JSON.stringify(data));
-    return true;
-  } catch {
-    /* almacenamiento lleno o bloqueado */
-    return false;
-  }
-};
+const TABLA = "crm_clients";
 
 export const clienteKey = (cliente) => {
   const email = (cliente?.email || "").trim().toLowerCase();
@@ -29,44 +10,63 @@ export const clienteKey = (cliente) => {
   return (cliente?.profileId || cliente?.key || "sin-identificar").toString();
 };
 
-export const getCrmData = (cliente) => {
-  const data = leer();
-  return data[clienteKey(cliente)] || { tags: [], notas: [] };
+const vacio = () => ({ tags: [], notas: [] });
+
+const normalizar = (row) => ({
+  tags: Array.isArray(row?.tags) ? row.tags : [],
+  notas: Array.isArray(row?.notas) ? row.notas : [],
+});
+
+export const getCrmData = async (cliente) => {
+  const { data, error } = await supabase
+    .from(TABLA)
+    .select("tags, notas")
+    .eq("client_key", clienteKey(cliente))
+    .maybeSingle();
+  if (error) throw error;
+  return data ? normalizar(data) : vacio();
 };
 
-export const getAllCrmData = () => leer();
-
-const guardarCliente = (key, valor) => {
-  const data = leer();
-  data[key] = valor;
-  escribir(data);
-  return valor;
+const upsert = async (cliente, patch) => {
+  const payload = {
+    client_key: clienteKey(cliente),
+    nombre: cliente?.nombre || null,
+    email: cliente?.email || null,
+    telefono: cliente?.telefono || null,
+    updated_at: new Date().toISOString(),
+    ...patch,
+  };
+  const { data, error } = await supabase
+    .from(TABLA)
+    .upsert(payload, { onConflict: "client_key" })
+    .select("tags, notas")
+    .single();
+  if (error) throw error;
+  return normalizar(data);
 };
 
-export const addTag = (cliente, tag) => {
-  const limpio = tag.trim();
-  if (!limpio) return getCrmData(cliente).tags;
-  const actual = getCrmData(cliente);
-  if (actual.tags.some((t) => t.toLowerCase() === limpio.toLowerCase())) return actual.tags;
-  return guardarCliente(clienteKey(cliente), { ...actual, tags: [...actual.tags, limpio] }).tags;
+export const addTag = async (cliente, tag, tagsActuales = []) => {
+  const limpio = (tag || "").trim();
+  if (!limpio) return tagsActuales;
+  if (tagsActuales.some((t) => t.toLowerCase() === limpio.toLowerCase())) return tagsActuales;
+  const { tags } = await upsert(cliente, { tags: [...tagsActuales, limpio] });
+  return tags;
 };
 
-export const removeTag = (cliente, tag) => {
-  const actual = getCrmData(cliente);
-  const tags = actual.tags.filter((t) => t !== tag);
-  return guardarCliente(clienteKey(cliente), { ...actual, tags }).tags;
+export const removeTag = async (cliente, tag, tagsActuales = []) => {
+  const { tags } = await upsert(cliente, { tags: tagsActuales.filter((t) => t !== tag) });
+  return tags;
 };
 
-export const addNota = (cliente, texto) => {
-  const limpio = texto.trim();
-  if (!limpio) return getCrmData(cliente).notas;
-  const actual = getCrmData(cliente);
+export const addNota = async (cliente, texto, notasActuales = []) => {
+  const limpio = (texto || "").trim();
+  if (!limpio) return notasActuales;
   const nota = { id: Date.now(), texto: limpio, fecha: new Date().toISOString() };
-  return guardarCliente(clienteKey(cliente), { ...actual, notas: [nota, ...actual.notas] }).notas;
+  const { notas } = await upsert(cliente, { notas: [nota, ...notasActuales] });
+  return notas;
 };
 
-export const removeNota = (cliente, id) => {
-  const actual = getCrmData(cliente);
-  const notas = actual.notas.filter((n) => n.id !== id);
-  return guardarCliente(clienteKey(cliente), { ...actual, notas }).notas;
+export const removeNota = async (cliente, id, notasActuales = []) => {
+  const { notas } = await upsert(cliente, { notas: notasActuales.filter((n) => n.id !== id) });
+  return notas;
 };
