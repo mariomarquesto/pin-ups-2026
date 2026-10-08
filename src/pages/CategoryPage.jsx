@@ -3,7 +3,7 @@ import { Container } from "react-bootstrap";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "../config/supabase";
 
-// Mapeo de nombres de categoría
+// Mapeo de nombres de categoría amigables
 const categoryNames = {
   vestidos: "Vestidos",
   pantalones: "Pantalones",
@@ -11,6 +11,8 @@ const categoryNames = {
   camperas: "Camperas y Abrigos",
   calzado: "Calzado",
   accesorios: "Accesorios",
+  lenceria: "Lencería y Conjuntos",
+  especial: "Línea Especial / Curvy"
 };
 
 const CategoryPage = () => {
@@ -23,12 +25,25 @@ const CategoryPage = () => {
     const fetchCategoryProducts = async () => {
       setLoading(true);
       try {
-        // Consultamos directo a Supabase filtrando por categoría
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('category', categoryName?.toLowerCase());
+        const searchTerm = categoryName?.toLowerCase() || '';
 
+        // 1. Intentar buscar primero por la relación con la tabla 'categories' (si usa category_id)
+        const { data: catData } = await supabase
+          .from('categories')
+          .select('id')
+          .ilike('slug', `%${searchTerm}%`)
+          .single();
+
+        let query = supabase.from('products').select('*');
+
+        if (catData) {
+          query = query.eq('category_id', catData.id);
+        } else {
+          // Fallback: buscar por el campo de texto 'category' o nombre del producto
+          query = query.or(`category.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`);
+        }
+
+        const { data, error } = await query;
         if (error) throw error;
         
         setFilteredProducts(data || []);
@@ -43,7 +58,7 @@ const CategoryPage = () => {
     fetchCategoryProducts();
 
     setCategoryTitle(
-      categoryNames[categoryName] ||
+      categoryNames[categoryName?.toLowerCase()] ||
         categoryName?.charAt(0).toUpperCase() + categoryName?.slice(1),
     );
   }, [categoryName]);
@@ -51,7 +66,7 @@ const CategoryPage = () => {
   if (loading) {
     return (
       <Container className="py-5 text-center">
-        <div className="spinner-border text-primary" role="status">
+        <div className="spinner-border text-primary" role="status" style={{ color: '#f85606' }}>
           <span className="visually-hidden">Cargando...</span>
         </div>
       </Container>
@@ -83,18 +98,7 @@ const CategoryPage = () => {
                 fontSize: '0.85rem',
                 fontWeight: '500',
                 border: 'none',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#e04a00';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(248, 86, 6, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#f85606';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
+                cursor: 'pointer'
               }}
             >
               <span style={{ fontSize: '1.1rem' }}>←</span>
@@ -107,13 +111,11 @@ const CategoryPage = () => {
         {filteredProducts.length > 0 ? (
           <div className="d-flex flex-wrap justify-content-center gap-4 py-4">
             {filteredProducts.map((item) => {
-              // Manejo de imágenes de Supabase (item.images es un array)
               const imageUrl = Array.isArray(item.images) && item.images.length > 0 
                 ? item.images[0] 
                 : (item.images || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600');
 
               const precioOriginal = item.price || 0;
-              // Si tenés columna de descuento podés usarla, sino muestra el precio directo
               const tieneDescuento = item.discountPercentage && item.discountPercentage > 0;
               const precioConDescuento = tieneDescuento 
                 ? precioOriginal - precioOriginal * item.discountPercentage * 0.01 
@@ -136,14 +138,13 @@ const CategoryPage = () => {
                   aria-label={`Ver detalles de ${item.name}`}
                 >
                   <div
-                    className="product-card h-100 border-0 shadow-sm"
+                    className="product-card h-100 border-0 shadow-sm bg-white rounded-4 overflow-hidden"
                     style={{ width: "280px", transition: "transform 0.3s" }}
                   >
                     <div
                       className="img-container position-relative overflow-hidden"
                       style={{
                         backgroundColor: "#f8f9fa",
-                        borderRadius: "8px 8px 0 0",
                       }}
                     >
                       {tieneDescuento && (
@@ -180,15 +181,6 @@ const CategoryPage = () => {
                         {item.name}
                       </h6>
 
-                      {item.rating && (
-                        <div className="d-flex align-items-center gap-1 mb-2">
-                          <span className="text-warning">★</span>
-                          <span className="small text-muted">
-                            {item.rating}
-                          </span>
-                        </div>
-                      )}
-
                       <div className="d-flex align-items-center gap-2">
                         <span
                           className="fw-bold"
@@ -212,7 +204,7 @@ const CategoryPage = () => {
           <div className="text-center py-5">
             <h4 className="text-muted">No hay productos en esta categoría</h4>
             <p className="text-muted">Pronto tendremos novedades para vos ✨</p>
-            <Link to="/">
+            <Link to="/" className="text-decoration-none mt-3 d-inline-block">
               <div 
                 className="d-inline-flex align-items-center gap-2 px-4 py-2 rounded-pill"
                 style={{ 
@@ -222,8 +214,6 @@ const CategoryPage = () => {
                   fontWeight: '500',
                   cursor: 'pointer'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e04a00'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#f85606'}
               >
                 <span>🛍️</span>
                 <span>Seguir comprando</span>
@@ -234,6 +224,6 @@ const CategoryPage = () => {
       </Container>
     </div>
   );
-};
+} 
 
 export default CategoryPage;

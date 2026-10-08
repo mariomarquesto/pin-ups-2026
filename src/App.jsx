@@ -1,6 +1,6 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
 import NavBar from './components/Header.jsx';
-import NavbarAdmin from './components/NavbarAdmin.jsx'; // 👈 Importamos el Navbar de Admin
+import NavbarAdmin from './components/NavbarAdmin.jsx';
 import Home from './pages/Home.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
@@ -25,6 +25,7 @@ import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import AdminProducts from './pages/admin/AdminProducts.jsx';
 import AdminOrders from './pages/admin/AdminOrders.jsx';
 import AdminCRM from './pages/admin/AdminCRM.jsx';
+import EditorDeBanners from './pages/admin/EditorDeBanners.jsx'; // 👈 1. Importamos el editor de banners
 
 import './App.css';
 
@@ -83,6 +84,12 @@ function App() {
             <AdminCRM/>
           </SecureAdminRoute>
         } />
+
+        <Route path='/admin/banners' element={
+          <SecureAdminRoute allowedRoles={['admin', 'empleado']}>
+            <EditorDeBanners/>
+          </SecureAdminRoute>
+        } /> {/* 👈 2. Agregamos la ruta protegida para los banners */}
 
         {/* ================= 404 (cualquier otra ruta) ================= */}
         <Route path='*' element={<NotFound/>} />
