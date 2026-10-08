@@ -39,8 +39,7 @@ declare
 begin
   foreach v_email in array array[
     -- ↓↓↓ EDITÁ ACÁ: emails creados en el Dashboard ↓↓↓
-    'admin@pin-ups.com',
-    'gerente@pin-ups.com'
+    'mario@gmail.com'
     -- ↑↑↑ uno por linea, separados por comas ↑↑↑
   ]
   loop
