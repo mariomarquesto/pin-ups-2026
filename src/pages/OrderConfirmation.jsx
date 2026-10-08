@@ -100,21 +100,16 @@ const OrderConfirmation = () => {
   const confirmarPedido = async () => {
     setLoadingSave(true);
     try {
-      const numeroOrdenFinal = orden.numeroOrden || `PU-${Date.now()}`;
-      const fechaFinal = orden.fecha || new Date().toLocaleString("es-AR");
-
+      // Mapeamos los datos al esquema real de la tabla orders de Supabase
       const payloadSupabase = {
-        numero_orden: numeroOrdenFinal,
-        fecha: fechaFinal,
-        cliente: orden.cliente || {},
-        productos: orden.productos || [orden.producto].filter(Boolean),
-        subtotal: orden.total || 0,
-        envio: orden.envio || 0,
+        customer_name: orden?.cliente?.nombre || 'Cliente Pin Ups',
+        customer_email: orden?.cliente?.email || 'No especificado',
+        customer_phone: orden?.cliente?.telefono || 'No especificado',
+        shipping_address: deliveryMethod,
         total: totalFinal,
+        status: 'Confirmada',
         payment_method: paymentMethod,
-        delivery_method: deliveryMethod,
-        observaciones: orden.observaciones || '',
-        estado: 'Confirmada'
+        delivery_method: deliveryMethod
       };
 
       const { error } = await supabase
@@ -129,8 +124,6 @@ const OrderConfirmation = () => {
 
       const nuevaOrden = {
         ...orden,
-        numeroOrden: numeroOrdenFinal,
-        fecha: fechaFinal,
         paymentMethod,
         deliveryMethod,
         total: totalFinal,
@@ -200,7 +193,7 @@ const OrderConfirmation = () => {
               </h1>
 
               <p className="text-muted">
-                Orden N°: <strong>{orden?.numeroOrden}</strong> • Fecha: {orden?.fecha}
+                Orden N°: <strong>{orden?.numeroOrden || 'PIN-UP'}</strong> | Fecha: {orden?.fecha || 'Hoy'}
               </p>
             </div>
 

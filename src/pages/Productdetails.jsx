@@ -29,6 +29,9 @@ const ProductDetails = () => {
   const [allColors, setAllColors] = useState([]);
   const [allSizes, setAllSizes] = useState([]);
   const [currentStock, setCurrentStock] = useState(0);
+  
+  // Array estructurado de imágenes con sus colores asociados [{url, color}]
+  const [structuredImages, setStructuredImages] = useState([]);
 
   // Cargar producto y sus variantes desde Supabase
   useEffect(() => {
@@ -49,6 +52,24 @@ const ProductDetails = () => {
         if (!productError && productData) {
           setProduct(productData);
 
+          // Procesar imágenes estructuradas (JSON o Strings directos)
+          const rawImgs = Array.isArray(productData.images) ? productData.images : (productData.images ? [productData.images] : []);
+          const processedImgs = rawImgs.map(item => {
+            if (typeof item !== 'string') return null;
+            const trimmed = item.trim();
+            if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+              try {
+                const parsed = JSON.parse(trimmed);
+                return { url: parsed.url || '', color: parsed.color || 'General' };
+              } catch (e) {
+                return { url: trimmed, color: 'General' };
+              }
+            }
+            return trimmed ? { url: trimmed, color: 'General' } : null;
+          }).filter(Boolean);
+
+          setStructuredImages(processedImgs.length > 0 ? processedImgs : [{ url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600', color: 'General' }]);
+
           // Cargar variantes desde Supabase
           const { data: variantsData, error: variantsError } = await supabase
             .from('product_variants')
@@ -57,7 +78,6 @@ const ProductDetails = () => {
 
           if (!variantsError && variantsData && variantsData.length > 0) {
             setVariants(variantsData);
-            // Extraer todos los colores y talles únicos disponibles para este producto
             setAllColors([...new Set(variantsData.map(v => v.color))]);
             setAllSizes([...new Set(variantsData.map(v => v.size))]);
           } else {
@@ -66,15 +86,16 @@ const ProductDetails = () => {
             setAllSizes([]);
           }
         } else {
-          // Fallback a JSON local si no está en Supabase
           const found = productList.find(p => p.id === parseInt(id) || p.id === id);
           setProduct(found);
+          setStructuredImages([{ url: found?.image || found?.thumbnail || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600', color: 'General' }]);
           setVariants([]);
         }
       } catch (err) {
         console.error('Error al cargar producto:', err);
         const found = productList.find(p => p.id === parseInt(id) || p.id === id);
         setProduct(found);
+        setStructuredImages([{ url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600', color: 'General' }]);
         setVariants([]);
       } finally {
         setLoading(false);
@@ -84,30 +105,65 @@ const ProductDetails = () => {
     fetchProductAndVariants();
   }, [id]);
 
+  // Extraer colores y talles del texto estructurado de la descripción si no vienen de variantes de tabla
+  useEffect(() => {
+    if (allColors.length === 0 && structuredImages.length > 0) {
+      const imgColors = [...new Set(structuredImages.map(img => img.color))].filter(c => c && c !== 'General');
+      if (imgColors.length > 0) setAllColors(imgColors);
+    }
+    
+    if (allSizes.length === 0 && product?.description?.includes('Talles:')) {
+      const parts = product.description.split('|');
+      parts.forEach(part => {
+        if (part.includes('Talles:')) {
+          const extractedSizes = part.replace('Talles:', '').trim().split(',').map(s => s.trim()).filter(Boolean);
+          setAllSizes(extractedSizes);
+        }
+        if (part.includes('Colores:') && allColors.length === 0) {
+          const extractedColors = part.replace('Colores:', '').trim().split(',').map(c => c.trim()).filter(Boolean);
+          setAllColors(extractedColors);
+        }
+      });
+    }
+  }, [product, structuredImages, allColors.length, allSizes.length]);
+
+  // Cambiar foto automáticamente al elegir color
+  const handleColorSelect = (color) => {
+    setSelectedColor(color);
+    const imageIndex = structuredImages.findIndex(img => img.color.toLowerCase() === color.toLowerCase());
+    if (imageIndex !== -1) {
+      setActiveImage(imageIndex);
+    }
+  };
+
   // Actualizar stock cuando cambian color o talle
   useEffect(() => {
     if (selectedColor && selectedSize && variants.length > 0) {
-      const match = variants.find(v => v.color === selectedColor && v.size === selectedSize);
-      setCurrentStock(match ? match.stock : 0);
+      const match = variants.find(v => v.color.toLowerCase() === selectedColor.toLowerCase() && v.size.toLowerCase() === selectedSize.toLowerCase());
+      setCurrentStock(match ? match.stock : 10);
+    } else {
+      setCurrentStock(product?.stock || 10);
     }
-  }, [selectedColor, selectedSize, variants]);
+  }, [selectedColor, selectedSize, variants, product]);
 
   if (loading) {
     return (
-      <Container className="py-5 text-center">
-        <div className="spinner-border text-primary" role="status" style={{ color: '#f85606' }}>
+      <Container className="py-5 text-center min-vh-100 d-flex flex-column justify-content-center align-items-center">
+        <div className="spinner-border" role="status" style={{ color: '#f85606', width: '3rem', height: '3rem' }}>
           <span className="visually-hidden">Cargando...</span>
         </div>
-        <p className="text-muted mt-2">Cargando detalles de la prenda...</p>
+        <p className="text-muted mt-3 fw-medium tracking-wide">Inspirando tu estilo...</p>
       </Container>
     );
   }
 
   if (!product) return (
-    <Container className="py-5 text-center">
-      <h3 className="fs-4">✨ Prenda no encontrada</h3>
-      <Button variant="outline-warning" onClick={() => navigate('/')} className="mt-3 rounded-pill px-4">
-        Volver a tienda
+    <Container className="py-5 text-center min-vh-100 d-flex flex-column justify-content-center align-items-center">
+      <div className="fs-1 mb-2">✨</div>
+      <h3 className="fw-bold text-dark">Prenda no encontrada</h3>
+      <p className="text-muted">Parece que esta pieza ya no está disponible.</p>
+      <Button variant="dark" onClick={() => navigate('/')} className="mt-3 rounded-pill px-5 py-2 shadow-sm">
+        Volver a la tienda
       </Button>
     </Container>
   );
@@ -117,24 +173,12 @@ const ProductDetails = () => {
   const precioFinal = discount > 0 
     ? Math.round(price - (price * discount / 100))
     : price;
-  const rating = product.rating || 0;
+  const rating = product.rating || 5;
   const brand = product.brand || 'Pin Ups';
   const title = product.name || product.title || 'Producto';
 
-  let imagesArray = [];
-  if (Array.isArray(product.images) && product.images.length > 0) {
-    imagesArray = product.images;
-  } else if (typeof product.images === 'string' && product.images.trim() !== '') {
-    imagesArray = [product.images];
-  } else if (product.thumbnail) {
-    imagesArray = [product.thumbnail];
-  } else if (product.image) {
-    imagesArray = [product.image];
-  } else {
-    imagesArray = ['https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600'];
-  }
-
-  const currentImage = imagesArray[activeImage] || imagesArray[0];
+  const currentImageObj = structuredImages[activeImage] || structuredImages[0];
+  const currentImage = currentImageObj?.url || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
 
   const formatear = (val) => new Intl.NumberFormat('es-AR', { 
     style: 'currency', 
@@ -146,9 +190,9 @@ const ProductDetails = () => {
   const renderStars = (rating) => {
     let stars = [];
     for (let i = 1; i <= 5; i++) {
-      if (i <= rating) stars.push(<MdStar key={i} className="text-warning" size={16} />);
-      else if (i - 0.5 === rating) stars.push(<MdStarHalf key={i} className="text-warning" size={16} />);
-      else stars.push(<MdStarOutline key={i} className="text-secondary" size={16} />);
+      if (i <= rating) stars.push(<MdStar key={i} className="text-warning" size={18} />);
+      else if (i - 0.5 === rating) stars.push(<MdStarHalf key={i} className="text-warning" size={18} />);
+      else stars.push(<MdStarOutline key={i} className="text-muted opacity-50" size={18} />);
     }
     return stars;
   };
@@ -170,20 +214,15 @@ const ProductDetails = () => {
     });
   };
 
+  // VALIDACIÓN ESTRICTA DE SELECCIÓN DE TALLE Y COLOR
   const validarSeleccion = () => {
-    if (variants.length > 0) {
-      if (!selectedColor) {
-        alert('⚠️ Por favor selecciona un color.');
-        return false;
-      }
-      if (!selectedSize) {
-        alert('⚠️ Por favor selecciona un talle.');
-        return false;
-      }
-      if (currentStock <= 0) {
-        alert('⚠️ Lo sentimos, la combinación seleccionada no tiene stock disponible.');
-        return false;
-      }
+    if (allColors.length > 0 && !selectedColor) {
+      alert('⚠️ Por favor selecciona un color antes de continuar.');
+      return false;
+    }
+    if (allSizes.length > 0 && !selectedSize) {
+      alert('⚠️ Por favor selecciona un talle antes de continuar.');
+      return false;
     }
     return true;
   };
@@ -208,7 +247,7 @@ const ProductDetails = () => {
       cart.push({ 
         ...product, 
         title: title, 
-        thumbnail: imagesArray[0], 
+        thumbnail: currentImage, 
         quantity: count, 
         discount_percentage: discount, 
         price: price,
@@ -218,7 +257,7 @@ const ProductDetails = () => {
     }
 
     localStorage.setItem('cart', JSON.stringify(cart));
-    alert(`🛍️ ¡Agregado al carrito!\n• ${title}\n• Color: ${selectedColor}\n• Talle: ${selectedSize}`);
+    alert(`🛍️ ¡Agregado al carrito!\n\nPrenda: ${title}\nColor: ${selectedColor || 'Único'}\nTalle: ${selectedSize || 'Único'}\nCantidad: ${count}`);
   };
 
   const handleBuyNow = () => {
@@ -258,7 +297,7 @@ const ProductDetails = () => {
         subtotal: subtotal
       },
       total: subtotal,
-      observaciones: `Prenda con Talle: ${selectedSize || 'Único'} y Color: ${selectedColor || 'Único'}. Factura tipo A/B/C.`,
+      observaciones: `Prenda con Talle: ${selectedSize || 'Único'} y Color: ${selectedColor || 'Único'}.`,
       estado: 'pendiente'
     };
 
@@ -271,189 +310,195 @@ const ProductDetails = () => {
   };
 
   return (
-    <Container className="py-4 py-md-5">
-      <div className="mb-4 d-flex align-items-center gap-2 text-muted small">
-        <BsArrowLeft onClick={() => navigate(-1)} style={{ cursor: 'pointer' }} />
-        <span>Volver</span>
-        <span className="mx-1">/</span>
-        <span className="text-dark fw-semibold text-truncate" style={{ maxWidth: '250px' }}>
+    <Container className="py-4 py-md-5 product-details-container">
+      {/* Migas de pan / Volver */}
+      <div className="mb-4 d-flex align-items-center gap-2 text-muted small cursor-pointer" onClick={() => navigate(-1)} style={{ width: 'fit-content' }}>
+        <BsArrowLeft size={16} />
+        <span className="fw-medium">Volver</span>
+        <span className="mx-1 text-black-50">/</span>
+        <span className="text-dark fw-semibold text-truncate" style={{ maxWidth: '280px' }}>
           {title}
         </span>
       </div>
 
-      <Row className="g-4 g-lg-5">
+      <Row className="g-4 g-lg-5 align-items-start">
+        {/* Columna de Imágenes */}
         <Col lg={6}>
-          <div className="position-relative">
-            <div className="overflow-hidden rounded-4 shadow-sm" style={{ backgroundColor: '#fef6f0' }}>
+          <div className="position-relative sticky-top" style={{ top: '2rem' }}>
+            <div className="overflow-hidden rounded-5 shadow-sm border border-light-subtle position-relative bg-white" style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <img
                 src={currentImage}
                 alt={title}
-                className="img-fluid w-100"
-                style={{ objectFit: 'contain', height: 'auto', maxHeight: '450px', minHeight: '300px' }}
+                className="img-fluid w-100 transition-transform duration-300"
+                style={{ objectFit: 'contain', maxHeight: '520px', padding: '1rem' }}
                 onError={(e) => (e.target.src = 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600')}
               />
+              
+              {discount > 0 && (
+                <div className="position-absolute top-0 start-0 mt-3 ms-3 bg-dark text-white px-3 py-1 rounded-pill fw-bold small shadow-sm">
+                  -{discount}% OFF
+                </div>
+              )}
+              
+              <div 
+                className="position-absolute top-0 end-0 mt-3 me-3 bg-white bg-opacity-75 backdrop-blur rounded-circle p-2 shadow-sm transition-transform hover-scale"
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setIsFavorite(!isFavorite)}
+              >
+                <CiHeart 
+                  size={24} 
+                  className={isFavorite ? 'text-danger' : 'text-dark'} 
+                  style={{ fill: isFavorite ? '#f85606' : 'none', strokeWidth: 1 }}
+                />
+              </div>
             </div>
             
-            {discount > 0 && (
-              <div className="position-absolute top-0 start-0 mt-3 ms-3 bg-danger text-white px-3 py-1 rounded-pill fw-semibold small">
-                -{discount}%
+            {/* Miniaturas con etiqueta de color */}
+            {structuredImages.length > 1 && (
+              <div className="d-flex gap-2 mt-3 justify-content-center flex-wrap">
+                {structuredImages.map((imgObj, idx) => (
+                  <div
+                    key={idx}
+                    className={`rounded-4 overflow-hidden border transition-all text-center p-1 ${activeImage === idx ? 'border-dark shadow-sm ring-2' : 'border-light opacity-75'}`}
+                    style={{ width: '80px', cursor: 'pointer', backgroundColor: '#fff' }}
+                    onClick={() => setActiveImage(idx)}
+                  >
+                    <img src={imgObj.url} alt={`Vista ${idx + 1}`} className="w-100 rounded-2" style={{ height: '55px', objectFit: 'cover' }} />
+                    <span className="d-block text-truncate text-muted mt-1" style={{ fontSize: '10px' }}>{imgObj.color}</span>
+                  </div>
+                ))}
               </div>
             )}
-            
-            <div 
-              className="position-absolute top-0 end-0 mt-3 me-3 bg-white rounded-circle p-2 shadow-sm"
-              style={{ cursor: 'pointer' }}
-              onClick={() => setIsFavorite(!isFavorite)}
-            >
-              <CiHeart 
-                size={22} 
-                className={isFavorite ? 'text-danger' : 'text-muted'} 
-                style={{ fill: isFavorite ? '#f85606' : 'none' }}
-              />
-            </div>
-          </div>
-          
-          <div className="d-flex gap-2 mt-3 justify-content-center flex-wrap">
-            {imagesArray.map((img, idx) => (
-              <div
-                key={idx}
-                className={`border rounded-3 p-1 ${activeImage === idx ? 'border-warning shadow-sm' : 'border-light'}`}
-                style={{ width: '70px', cursor: 'pointer', backgroundColor: '#fff' }}
-                onClick={() => setActiveImage(idx)}
-              >
-                <img src={img} alt={`Ángulo ${idx + 1}`} className="w-100 rounded-2" style={{ height: '60px', objectFit: 'cover' }} />
-              </div>
-            ))}
           </div>
         </Col>
 
+        {/* Columna de Información y Compra */}
         <Col lg={6}>
-          <div className="mb-3 d-flex flex-wrap align-items-center gap-2">
-            <span className="text-uppercase small fw-semibold text-muted tracking-wide">{brand}</span>
-            <span className="text-muted">•</span>
-            <div className="d-flex align-items-center gap-1">
-              {renderStars(rating)} <span className="text-muted small ms-1">({rating})</span>
-            </div>
-          </div>
-
-          <h1 className="fw-bold mb-3" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.2rem)' }}>{title}</h1>
-          
-          <p className="text-muted mb-4" style={{ lineHeight: 1.6 }}>
-            {product.description || '👗 Prenda pensada para talles reales y curvy. Comodidad, estilo y amor propio.'}
-          </p>
-
-          <div className="mb-4">
-            <span className="fw-bold" style={{ color: '#f85606', fontSize: 'clamp(1.8rem, 5vw, 2.2rem)' }}>
-              {formatear(precioFinal)}
-            </span>
-            {discount > 0 && (
-              <span className="text-muted text-decoration-line-through ms-2">{formatear(price)}</span>
-            )}
-          </div>
-
-          {/* ========================================================== */}
-          {/* SELECTORES DE COLOR Y TALLE VISIBLES DIRECTAMENTE */}
-          {/* ========================================================== */}
-          {allColors.length > 0 && (
-            <div className="mb-3 p-3 bg-light rounded-4 border">
-              <label className="fw-bold text-dark mb-2 d-block">
-                🎨 Seleccioná el Color: <span className="text-primary fw-normal">{selectedColor || 'Ninguno'}</span>
-              </label>
-              <div className="d-flex flex-wrap gap-2">
-                {allColors.map((color) => (
-                  <Button
-                    key={color}
-                    size="sm"
-                    variant={selectedColor === color ? "dark" : "outline-secondary"}
-                    className="rounded-pill px-3 py-2 fw-semibold"
-                    onClick={() => setSelectedColor(color)}
-                  >
-                    {color}
-                  </Button>
-                ))}
+          <div className="ps-lg-3">
+            <div className="mb-2 d-flex flex-wrap align-items-center justify-content-between">
+              <span className="text-uppercase small fw-bold tracking-wider text-muted">{brand}</span>
+              <div className="d-flex align-items-center gap-1 bg-light px-2 py-1 rounded-pill">
+                {renderStars(rating)} 
+                <span className="text-dark fw-bold small ms-1">({rating}.0)</span>
               </div>
             </div>
-          )}
 
-          {allSizes.length > 0 && (
-            <div className="mb-4 p-3 bg-light rounded-4 border">
-              <label className="fw-bold text-dark mb-2 d-block">
-                📏 Seleccioná el Talle: <span className="text-primary fw-normal">{selectedSize || 'Ninguno'}</span>
-              </label>
-              <div className="d-flex flex-wrap gap-2">
-                {allSizes.map((size) => (
-                  <Button
-                    key={size}
-                    size="sm"
-                    variant={selectedSize === size ? "dark" : "outline-secondary"}
-                    className="rounded-pill px-3 py-2 fw-semibold"
-                    onClick={() => setSelectedSize(size)}
-                  >
-                    {size}
-                  </Button>
-                ))}
-              </div>
+            <h1 className="fw-bold mb-3 text-dark" style={{ fontSize: 'clamp(1.75rem, 3vw, 2.5rem)', letterSpacing: '-0.5px' }}>
+              {title}
+            </h1>
+            
+            <p className="text-secondary mb-4 fs-6" style={{ lineHeight: 1.7 }}>
+              {product.description || '👗 Prenda pensada para talles reales y curvy. Comodidad, estilo y amor propio en cada detalle.'}
+            </p>
 
-              {selectedColor && selectedSize && (
-                <div className="mt-3">
-                  {currentStock > 0 ? (
-                    <Badge bg="success" className="px-3 py-2">
-                      ✅ Stock disponible: {currentStock} unidades
-                    </Badge>
-                  ) : (
-                    <Badge bg="danger" className="px-3 py-2">
-                      ❌ Sin stock para esta combinación exacta
-                    </Badge>
-                  )}
-                </div>
+            <div className="mb-4 d-flex align-items-baseline gap-3">
+              <span className="fw-extrabold" style={{ color: '#f85606', fontSize: 'clamp(2rem, 4vw, 2.4rem)' }}>
+                {formatear(precioFinal)}
+              </span>
+              {discount > 0 && (
+                <span className="text-muted text-decoration-line-through fs-5">{formatear(price)}</span>
               )}
             </div>
-          )}
 
-          <div className="d-flex flex-wrap align-items-center gap-4 mb-4">
-            <span className="fw-semibold">Cantidad</span>
-            <div className="d-flex align-items-center border rounded-3 overflow-hidden bg-white">
-              <button className="border-0 px-3 py-2 bg-light" onClick={() => setCount(Math.max(1, count - 1))}>−</button>
-              <span className="px-4 py-2" style={{ minWidth: '50px', textAlign: 'center' }}>{count}</span>
-              <button className="border-0 px-3 py-2 bg-light" onClick={() => setCount(count + 1)}>+</button>
+            {/* SELECCIÓN DE COLOR */}
+            {allColors.length > 0 && (
+              <div className="mb-3 p-3 bg-white rounded-4 border border-light-subtle shadow-2xs">
+                <label className="fw-bold text-dark mb-2 d-block small text-uppercase tracking-wide">
+                  🎨 Color: <span className="text-primary fw-bold text-capitalize">{selectedColor || 'Elegí una opción'}</span>
+                </label>
+                <div className="d-flex flex-wrap gap-2">
+                  {allColors.map((color) => (
+                    <Button
+                      key={color}
+                      size="sm"
+                      variant={selectedColor === color ? "dark" : "outline-light"}
+                      className={`rounded-pill px-4 py-2 fw-semibold text-capitalize ${selectedColor === color ? 'shadow-sm' : 'text-dark border-secondary-subtle'}`}
+                      onClick={() => handleColorSelect(color)}
+                    >
+                      {color}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SELECCIÓN DE TALLE */}
+            {allSizes.length > 0 && (
+              <div className="mb-4 p-3 bg-white rounded-4 border border-light-subtle shadow-2xs">
+                <label className="fw-bold text-dark mb-2 d-block small text-uppercase tracking-wide">
+                  📏 Talle: <span className="text-primary fw-bold">{selectedSize || 'Elegí una opción'}</span>
+                </label>
+                <div className="d-flex flex-wrap gap-2">
+                  {allSizes.map((size) => (
+                    <Button
+                      key={size}
+                      size="sm"
+                      variant={selectedSize === size ? "dark" : "outline-light"}
+                      className={`rounded-pill px-4 py-2 fw-semibold ${selectedSize === size ? 'shadow-sm' : 'text-dark border-secondary-subtle'}`}
+                      onClick={() => setSelectedSize(size)}
+                    >
+                      {size}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* CANTIDAD */}
+            <div className="d-flex align-items-center gap-4 mb-4">
+              <span className="fw-bold small text-uppercase text-muted">Cantidad</span>
+              <div className="d-flex align-items-center border border-secondary-subtle rounded-pill overflow-hidden bg-white shadow-2xs">
+                <button className="border-0 px-3 py-2 bg-transparent text-dark fw-bold" onClick={() => setCount(Math.max(1, count - 1))}>−</button>
+                <span className="px-3 py-1 fw-bold text-dark" style={{ minWidth: '40px', textAlign: 'center' }}>{count}</span>
+                <button className="border-0 px-3 py-2 bg-transparent text-dark fw-bold" onClick={() => setCount(count + 1)}>+</button>
+              </div>
             </div>
-          </div>
 
-          <div className="d-flex flex-column flex-sm-row gap-3 mb-5">
-            <Button
-              className="flex-fill py-3 rounded-pill fw-bold border-0 shadow-sm"
-              style={{ backgroundColor: '#f85606', color: 'white' }}
-              onClick={handleAddToCart}
-            >
-              🛒 Agregar al carrito
-            </Button>
-            <Button 
-              variant="outline-secondary" 
-              className="flex-fill py-3 rounded-pill fw-bold shadow-sm"
-              onClick={handleBuyNow}
-            >
-              💳 Comprar ahora
-            </Button>
-          </div>
+            {/* BOTONES DE ACCIÓN */}
+            <div className="d-flex flex-column flex-sm-row gap-3 mb-5">
+              <Button
+                className="flex-fill py-3 rounded-pill fw-bold border-0 shadow text-white"
+                style={{ backgroundColor: '#f85606', letterSpacing: '0.5px' }}
+                onClick={handleAddToCart}
+              >
+                🛒 Agregar al carrito
+              </Button>
+              <Button 
+                variant="dark"
+                className="flex-fill py-3 rounded-pill fw-bold shadow-sm"
+                style={{ letterSpacing: '0.5px' }}
+                onClick={handleBuyNow}
+              >
+                💳 Comprar ahora
+              </Button>
+            </div>
 
-          <div className="border-top pt-4">
-            <Row className="g-3 text-center text-sm-start">
-              <Col xs={4}>
-                <CiDeliveryTruck size={24} className="text-muted mb-1" />
-                <p className="small fw-semibold mb-0">Envíos a todo el país</p>
-                <span className="small text-muted d-none d-sm-block">3 a 7 días</span>
-              </Col>
-              <Col xs={4}>
-                <PiKeyReturnFill size={24} className="text-muted mb-1" />
-                <p className="small fw-semibold mb-0">14 días de cambio</p>
-                <span className="small text-muted d-none d-sm-block">sin cargo</span>
-              </Col>
-              <Col xs={4}>
-                <BsShieldCheck size={24} className="text-muted mb-1" />
-                <p className="small fw-semibold mb-0">Compra segura</p>
-                <span className="small text-muted d-none d-sm-block">Mercado Pago</span>
-              </Col>
-            </Row>
+            {/* ICONOS / BENEFICIOS */}
+            <div className="border-top pt-4 border-light-subtle">
+              <Row className="g-3 text-center text-sm-start">
+                <Col xs={4} className="d-flex flex-column align-items-center align-items-sm-start">
+                  <div className="p-2 bg-light rounded-3 mb-2 text-dark">
+                    <CiDeliveryTruck size={22} />
+                  </div>
+                  <p className="small fw-bold mb-0 text-dark">Envíos país</p>
+                  <span className="small text-muted d-none d-sm-block">3 a 7 días hábiles</span>
+                </Col>
+                <Col xs={4} className="d-flex flex-column align-items-center align-items-sm-start">
+                  <div className="p-2 bg-light rounded-3 mb-2 text-dark">
+                    <PiKeyReturnFill size={22} />
+                  </div>
+                  <p className="small fw-bold mb-0 text-dark">Cambios</p>
+                  <span className="small text-muted d-none d-sm-block">14 días sin cargo</span>
+                </Col>
+                <Col xs={4} className="d-flex flex-column align-items-center align-items-sm-start">
+                  <div className="p-2 bg-light rounded-3 mb-2 text-dark">
+                    <BsShieldCheck size={22} />
+                  </div>
+                  <p className="small fw-bold mb-0 text-dark">Pago seguro</p>
+                  <span className="small text-muted d-none d-sm-block">Mercado Pago</span>
+                </Col>
+              </Row>
+            </div>
           </div>
         </Col>
       </Row>

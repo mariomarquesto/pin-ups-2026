@@ -9,6 +9,37 @@ function Product() {
   const { productos, loading } = useProducts();
   const cardsRef = useRef([]);
 
+  // Función segura para extraer la URL limpia sin importar si es string, array o JSON de Supabase
+  const getImageUrl = (item) => {
+    let rawImg = null;
+
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      rawImg = item.images[0];
+    } else if (item.thumbnail) {
+      rawImg = item.thumbnail;
+    } else if (item.image) {
+      rawImg = item.image;
+    }
+
+    if (!rawImg) return PLACEHOLDER_IMG;
+
+    // Si la imagen viene como un string JSON estructurado desde el panel de administración
+    if (typeof rawImg === 'string') {
+      const trimmed = rawImg.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return parsed.url || PLACEHOLDER_IMG;
+        } catch (e) {
+          return trimmed;
+        }
+      }
+      return trimmed;
+    }
+
+    return PLACEHOLDER_IMG;
+  };
+
   // Efecto cascada con Intersection Observer
   useEffect(() => {
     const observer = new IntersectionObserver((entries) => {
@@ -48,19 +79,11 @@ function Product() {
   return (
     <div className='d-flex flex-wrap justify-content-center gap-4 py-4'>
       {productos.map((item, index) => {
-        // Soporte tanto para Supabase (name, images[], compare_at_price) como para JSON antiguo
         const title = item.name || item.title || 'Producto';
         const price = item.price || 0;
         
-        // Manejo de imágenes (si es array de Supabase usa la primera, si es string usa esa, o un fallback seguro)
-        let imageUrl = PLACEHOLDER_IMG;
-        if (Array.isArray(item.images) && item.images.length > 0) {
-          imageUrl = item.images[0];
-        } else if (item.thumbnail) {
-          imageUrl = item.thumbnail;
-        } else if (item.image) {
-          imageUrl = item.image;
-        }
+        // Obtenemos la URL de la imagen de forma limpia y segura
+        const imageUrl = getImageUrl(item);
 
         // Cálculo de descuento basado en compare_at_price si existe
         let discount = item.discountPercentage || item.discount_percentage || 0;
@@ -90,7 +113,10 @@ function Product() {
                   <Card.Img 
                     variant="top" 
                     src={imageUrl} 
-                    className='product-img' 
+                    className='product-img'
+                    onError={(e) => {
+                      e.target.src = PLACEHOLDER_IMG;
+                    }}
                   />
                 </div>
                 <Card.Body className="d-flex flex-column">

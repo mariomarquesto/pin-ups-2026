@@ -1,6 +1,6 @@
 // src/pages/Addtocart.jsx
 import { useEffect, useState, useCallback } from "react";
-import { Button, Card, Container, Row, Col, Image } from "react-bootstrap";
+import { Button, Card, Container, Row, Col, Image, Badge } from "react-bootstrap";
 import { FaTrashAlt, FaPlus, FaMinus, FaShoppingCart } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { isLoggedIn, getSessionUser } from "../utils/session";
@@ -35,7 +35,6 @@ const Addtocart = () => {
     setTotal(subtotalAmount + shipping);
   }, [cart]);
 
-  // Calcular totales cuando el carrito cambia
   useEffect(() => {
     calculateTotals();
   }, [calculateTotals]);
@@ -45,19 +44,23 @@ const Addtocart = () => {
     setCart(savedCart);
   };
 
-  const updateQuantity = (itemId, newQuantity) => {
+  const updateQuantity = (itemId, selectedSize, selectedColor, newQuantity) => {
     if (newQuantity < 1) return;
 
     const updatedCart = cart.map((item) =>
-      item.id === itemId ? { ...item, quantity: newQuantity } : item,
+      item.id === itemId && item.selectedSize === selectedSize && item.selectedColor === selectedColor
+        ? { ...item, quantity: newQuantity } 
+        : item,
     );
     setCart(updatedCart);
     localStorage.setItem("cart", JSON.stringify(updatedCart));
   };
 
-  const removeItem = (itemId, itemTitle) => {
-    if (window.confirm(`¿Eliminar ${itemTitle} del carrito?`)) {
-      const updatedCart = cart.filter((item) => item.id !== itemId);
+  const removeItem = (itemId, selectedSize, selectedColor, itemTitle) => {
+    if (window.confirm(`¿Eliminar ${itemTitle} (Talle: ${selectedSize}, Color: ${selectedColor}) del carrito?`)) {
+      const updatedCart = cart.filter(
+        (item) => !(item.id === itemId && item.selectedSize === selectedSize && item.selectedColor === selectedColor)
+      );
       setCart(updatedCart);
       localStorage.setItem("cart", JSON.stringify(updatedCart));
     }
@@ -84,6 +87,32 @@ const Addtocart = () => {
     const price = item.price || 0;
     const priceWithDiscount = price - (price * discount * 0.01);
     return priceWithDiscount * (item.quantity || 1);
+  };
+
+  // Función auxiliar segura para extraer la imagen sin importar si es JSON o string
+  const getProductImage = (item) => {
+    let rawImg = item.thumbnail || item.image;
+    
+    if (!rawImg && Array.isArray(item.images) && item.images.length > 0) {
+      rawImg = item.images[0];
+    }
+
+    if (!rawImg) return 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
+
+    if (typeof rawImg === 'string') {
+      const trimmed = rawImg.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          return parsed.url || 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
+        } catch (e) {
+          return trimmed;
+        }
+      }
+      return trimmed;
+    }
+
+    return 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600';
   };
 
   // ============================================================
@@ -133,6 +162,8 @@ const Addtocart = () => {
       return {
         id: item.id,
         titulo: item.title || item.name || 'Producto',
+        talle: item.selectedSize || 'Único',
+        color: item.selectedColor || 'Único',
         cantidad: item.quantity || 1,
         precioUnitario: priceWithDiscount,
         subtotal: priceWithDiscount * (item.quantity || 1)
@@ -160,7 +191,6 @@ const Addtocart = () => {
     localStorage.setItem('ordenes', JSON.stringify(ordenes));
     localStorage.setItem('ultimaOrden', JSON.stringify(orden));
     
-    // Redirigir a la pantalla de confirmación interna sin abrir WhatsApp
     navigate('/orden-confirmada');
   };
 
@@ -175,8 +205,8 @@ const Addtocart = () => {
           </p>
           <Link to="/">
             <Button
-              className="rounded-pill px-4 py-2"
-              style={{ backgroundColor: "#f85606", borderColor: "#f85606" }}
+              className="rounded-pill px-4 py-2 border-0"
+              style={{ backgroundColor: "#f85606" }}
             >
               Seguir comprando 🛍️
             </Button>
@@ -211,7 +241,7 @@ const Addtocart = () => {
             const hasDiscount = discount > 0;
             const originalPrice = item.price || 0;
             const discountedPrice = originalPrice - (originalPrice * discount * 0.01);
-            const itemImage = item.thumbnail || item.image || 'https://via.placeholder.com/100';
+            const itemImage = getProductImage(item);
             const itemTitle = item.title || item.name || 'Producto';
 
             return (
@@ -227,9 +257,9 @@ const Addtocart = () => {
                       alt={itemTitle}
                       fluid
                       className="rounded-3"
-                      style={{ maxHeight: "100px", objectFit: "contain" }}
+                      style={{ maxHeight: "110px", objectFit: "contain" }}
                       onError={(e) =>
-                        (e.target.src = "https://via.placeholder.com/100")
+                        (e.target.src = "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600")
                       }
                     />
                   </Col>
@@ -240,13 +270,20 @@ const Addtocart = () => {
                       <Card.Title className="fs-6 fw-bold mb-1">
                         {itemTitle}
                       </Card.Title>
-                      <Card.Text className="small text-muted mb-2">
-                        {item.brand || 'Pin Ups'}
-                      </Card.Text>
+                      
+                      {/* Talle y Color seleccionado */}
+                      <div className="d-flex gap-1 mb-2">
+                        <Badge bg="dark" className="px-2 py-1 fw-normal" style={{ fontSize: '11px' }}>
+                          Talle: {item.selectedSize || 'Único'}
+                        </Badge>
+                        <Badge bg="secondary" className="px-2 py-1 fw-normal" style={{ fontSize: '11px' }}>
+                          Color: {item.selectedColor || 'Único'}
+                        </Badge>
+                      </div>
 
                       <div className="d-flex flex-wrap gap-2 align-items-center">
                         <span
-                          className="fw-bold text-primary"
+                          className="fw-bold"
                           style={{ color: "#f85606" }}
                         >
                           {formatPrice(discountedPrice)}
@@ -272,27 +309,27 @@ const Addtocart = () => {
                         <Button
                           variant="light"
                           size="sm"
-                          className="rounded-circle d-flex align-items-center justify-content-center"
+                          className="rounded-circle d-flex align-items-center justify-content-center border"
                           style={{ width: "32px", height: "32px" }}
                           onClick={() =>
-                            updateQuantity(item.id, (item.quantity || 1) - 1)
+                            updateQuantity(item.id, item.selectedSize, item.selectedColor, (item.quantity || 1) - 1)
                           }
                         >
                           <FaMinus size={12} />
                         </Button>
                         <span
                           className="fw-semibold mx-2"
-                          style={{ minWidth: "40px", textAlign: "center" }}
+                          style={{ minWidth: "30px", textAlign: "center" }}
                         >
                           {item.quantity || 1}
                         </span>
                         <Button
                           variant="light"
                           size="sm"
-                          className="rounded-circle d-flex align-items-center justify-content-center"
+                          className="rounded-circle d-flex align-items-center justify-content-center border"
                           style={{ width: "32px", height: "32px" }}
                           onClick={() =>
-                            updateQuantity(item.id, (item.quantity || 1) + 1)
+                            updateQuantity(item.id, item.selectedSize, item.selectedColor, (item.quantity || 1) + 1)
                           }
                         >
                           <FaPlus size={12} />
@@ -301,7 +338,7 @@ const Addtocart = () => {
 
                       <div className="text-end">
                         <div
-                          className="fw-bold text-primary mb-1"
+                          className="fw-bold mb-1"
                           style={{ color: "#f85606" }}
                         >
                           {formatPrice(itemTotal)}
@@ -309,8 +346,8 @@ const Addtocart = () => {
                         <Button
                           variant="link"
                           size="sm"
-                          className="text-danger p-0"
-                          onClick={() => removeItem(item.id, itemTitle)}
+                          className="text-danger p-0 text-decoration-none"
+                          onClick={() => removeItem(item.id, item.selectedSize, item.selectedColor, itemTitle)}
                         >
                           <FaTrashAlt size={14} />
                         </Button>
