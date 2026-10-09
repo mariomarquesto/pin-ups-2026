@@ -22,9 +22,10 @@ const OrderConfirmation = () => {
   const [paymentMethod, setPaymentMethod] = useState("Transferencia");
   const [deliveryMethod, setDeliveryMethod] = useState("Retiro por sucursal");
 
-  // Estados independientes para los descuentos configurados por el Admin
-  const [cashDiscount, setCashDiscount] = useState(20);
+  // Descuentos cargados desde la base de datos
+  const [cashDiscount, setCashDiscount] = useState(30);
   const [transferDiscount, setTransferDiscount] = useState(15);
+  const [discountsEnabled, setDiscountsEnabled] = useState(true);
 
   useEffect(() => {
     const ultimaOrden = JSON.parse(
@@ -42,26 +43,31 @@ const OrderConfirmation = () => {
       navigate("/");
     }
 
-    // Cargar los porcentajes de descuento independientes desde Supabase
+    // Cargar la configuración de descuentos desde store_settings de Supabase
     const fetchDiscounts = async () => {
       try {
         const { data, error } = await supabase
           .from('store_settings')
-          .select('key, value')
-          .in('key', ['cash_discount', 'transfer_discount']);
+          .select('key, value');
 
         if (!error && data) {
           data.forEach(item => {
-            if (item.key === 'cash_discount') {
-              setCashDiscount(parseFloat(item.value) || 20);
+            const key = item.key.toLowerCase();
+            const val = item.value;
+
+            if (key.includes('cash') || key.includes('efectivo')) {
+              setCashDiscount(parseFloat(val) || 0);
             }
-            if (item.key === 'transfer_discount') {
-              setTransferDiscount(parseFloat(item.value) || 15);
+            if (key.includes('transfer') || key.includes('transferencia')) {
+              setTransferDiscount(parseFloat(val) || 0);
+            }
+            if (key.includes('enabled')) {
+              setDiscountsEnabled(val === "true" || val === true);
             }
           });
         }
       } catch (err) {
-        console.error("No se pudieron cargar los descuentos del admin:", err);
+        console.error("Error al sincronizar descuentos del admin:", err);
       }
     };
 
@@ -76,22 +82,23 @@ const OrderConfirmation = () => {
       maximumFractionDigits: 0,
     }).format(valor || 0);
 
-  // Calcular el total aplicando el descuento correspondiente
+  // Calcular el total final aplicando el descuento de la BD
   const calcularTotalFinal = () => {
     if (!orden) return 0;
     const subtotalOriginal = orden.total || 0;
     
-    if (paymentMethod === "Efectivo") {
+    if (!discountsEnabled) return subtotalOriginal;
+
+    if (paymentMethod === "Efectivo" && cashDiscount > 0) {
       const descuento = (subtotalOriginal * cashDiscount) / 100;
       return Math.round(subtotalOriginal - descuento);
     } 
     
-    if (paymentMethod === "Transferencia") {
+    if (paymentMethod === "Transferencia" && transferDiscount > 0) {
       const descuento = (subtotalOriginal * transferDiscount) / 100;
       return Math.round(subtotalOriginal - descuento);
     }
     
-    // Si es Tarjeta, queda el precio de lista original sin descuento
     return subtotalOriginal;
   };
 
@@ -100,8 +107,8 @@ const OrderConfirmation = () => {
   const confirmarPedido = async () => {
     setLoadingSave(true);
     try {
-      // Mapeamos los datos al esquema real de la tabla orders de Supabase
-      const payloadSupabase = {
+      // 1. Guardar la cabecera del pedido en la tabla orders
+      const payloadOrden = {
         customer_name: orden?.cliente?.nombre || 'Cliente Pin Ups',
         customer_email: orden?.cliente?.email || 'No especificado',
         customer_phone: orden?.cliente?.telefono || 'No especificado',
@@ -112,18 +119,39 @@ const OrderConfirmation = () => {
         delivery_method: deliveryMethod
       };
 
-      const { error } = await supabase
+      const { data: orderData, error: orderError } = await supabase
         .from('orders')
-        .insert([payloadSupabase]);
+        .insert([payloadOrden])
+        .select()
+        .single();
 
-      if (error) {
-        throw new Error(error.message);
+      if (orderError) throw new Error(orderError.message);
+
+      const newOrderId = orderData.id;
+
+      // 2. Extraer las prendas y guardarlas en la tabla relacional order_items
+      const listaPrendas = orden.productos || (orden.producto ? [orden.producto] : []);
+      
+      if (listaPrendas.length > 0) {
+        const itemsPayload = listaPrendas.map(prod => ({
+          order_id: newOrderId,
+          product_id: prod.id && !isNaN(prod.id) ? parseInt(prod.id) : null,
+          quantity: prod.cantidad || prod.quantity || 1,
+          price_at_purchase: prod.subtotal ? (prod.subtotal / (prod.cantidad || prod.quantity || 1)) : (prod.precioUnitario || prod.price || 0)
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('order_items')
+          .insert(itemsPayload);
+
+        if (itemsError) {
+          console.error("Error al guardar ítems de la orden:", itemsError);
+        }
       }
-
-      console.log('✅ Orden guardada exitosamente en la Base de Datos');
 
       const nuevaOrden = {
         ...orden,
+        id: newOrderId,
         paymentMethod,
         deliveryMethod,
         total: totalFinal,
@@ -140,7 +168,7 @@ const OrderConfirmation = () => {
 
     } catch (err) {
       console.error('Error crítico al registrar orden en Supabase:', err);
-      alert('❌ Error al registrar el pedido en la Base de Datos. Por favor, verifica tu conexión e inténtalo nuevamente.');
+      alert('❌ Error al registrar el pedido en la Base de Datos. Por favor, verifica tu conexión.');
     } finally {
       setLoadingSave(false);
     }
@@ -193,7 +221,7 @@ const OrderConfirmation = () => {
               </h1>
 
               <p className="text-muted">
-                Orden N°: <strong>{orden?.numeroOrden || 'PIN-UP'}</strong> | Fecha: {orden?.fecha || 'Hoy'}
+                N° de orden: <strong>{orden?.numeroOrden || 'PIN-UP'}</strong> | Fecha: {orden?.fecha || 'Hoy'}
               </p>
             </div>
 
@@ -209,7 +237,7 @@ const OrderConfirmation = () => {
                     <p className="fw-semibold mb-2 mb-md-0">{orden?.cliente?.nombre || "No especificado"}</p>
                   </Col>
                   <Col md={4}>
-                    <p className="mb-1 text-muted small">Email</p>
+                    <p className="mb-1 text-muted small">Correo electrónico</p>
                     <p className="fw-semibold mb-2 mb-md-0">{orden?.cliente?.email || "No especificado"}</p>
                   </Col>
                   <Col md={4}>
@@ -239,7 +267,7 @@ const OrderConfirmation = () => {
                           onChange={(e) => setPaymentMethod(e.target.value)}
                           className="rounded-3 py-2"
                         >
-                          <option value="Transferencia">Transferencia ({transferDiscount}% OFF)</option>
+                          <option value="Transferencia">Transferencia ({transferDiscount}% de descuento)</option>
                           <option value="Efectivo">Abonando en Efectivo ({cashDiscount}% OFF)</option>
                           <option value="Tarjeta">Tarjeta (Precio de lista)</option>
                         </Form.Select>
@@ -319,13 +347,13 @@ const OrderConfirmation = () => {
                   </Table>
                 </div>
 
-                {paymentMethod === "Efectivo" && (
+                {paymentMethod === "Efectivo" && cashDiscount > 0 && (
                   <div className="alert alert-success py-2 px-3 small mb-3">
-                    ✨ ¡Descuento de efectivo del <strong>{cashDiscount}%</strong> aplicado correctamente!
+                    ✨ ¡Descuento en efectivo del <strong>{cashDiscount}%</strong> aplicado correctamente!
                   </div>
                 )}
 
-                {paymentMethod === "Transferencia" && (
+                {paymentMethod === "Transferencia" && transferDiscount > 0 && (
                   <div className="alert alert-success py-2 px-3 small mb-3">
                     ✨ ¡Descuento de transferencia del <strong>{transferDiscount}%</strong> aplicado correctamente!
                   </div>

@@ -42,9 +42,10 @@ const AdminDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados para los descuentos configurables
-  const [cashDiscount, setCashDiscount] = useState(20);
+  // Estados para los descuentos configurables y su interruptor de encendido/apagado
+  const [cashDiscount, setCashDiscount] = useState(30);
   const [transferDiscount, setTransferDiscount] = useState(15);
+  const [discountsEnabled, setDiscountsEnabled] = useState(true);
   const [savingDiscounts, setSavingDiscounts] = useState(false);
 
   const currentUser = getSessionUser() || {};
@@ -61,7 +62,7 @@ const AdminDashboard = () => {
       }
 
       try {
-        // Cargar pedidos desde Supabase (tabla orders) sin límite para contar bien
+        // Cargar pedidos
         const { data: ordData, error: ordError } = await supabase
           .from("orders")
           .select("*")
@@ -70,7 +71,6 @@ const AdminDashboard = () => {
         if (!ordError && ordData && ordData.length > 0) {
           setOrders(ordData);
         } else {
-          // Fallback a localStorage si Supabase no trae nada
           const legacy = JSON.parse(localStorage.getItem("ordenes")) || [];
           setOrders(Array.isArray(legacy) ? legacy : []);
         }
@@ -84,13 +84,13 @@ const AdminDashboard = () => {
         // Cargar ajustes de descuentos de store_settings
         const { data: settingsData } = await supabase
           .from("store_settings")
-          .select("key, value")
-          .in("key", ["cash_discount", "transfer_discount"]);
+          .select("key, value");
 
         if (settingsData) {
           settingsData.forEach(item => {
-            if (item.key === "cash_discount") setCashDiscount(parseFloat(item.value) || 20);
+            if (item.key === "cash_discount") setCashDiscount(parseFloat(item.value) || 30);
             if (item.key === "transfer_discount") setTransferDiscount(parseFloat(item.value) || 15);
+            if (item.key === "discounts_enabled") setDiscountsEnabled(item.value === "true" || item.value === true);
           });
         }
       } catch (err) {
@@ -111,11 +111,12 @@ const AdminDashboard = () => {
         .from("store_settings")
         .upsert([
           { key: "cash_discount", value: String(cashDiscount) },
-          { key: "transfer_discount", value: String(transferDiscount) }
+          { key: "transfer_discount", value: String(transferDiscount) },
+          { key: "discounts_enabled", value: String(discountsEnabled) }
         ], { onConflict: "key" });
 
       if (error) throw error;
-      alert("¡Porcentajes de descuento actualizados correctamente en la base de datos!");
+      alert("¡Configuración de descuentos actualizada correctamente!");
     } catch (err) {
       console.error("Error al guardar descuentos:", err);
       alert("Hubo un error al guardar los descuentos.");
@@ -123,14 +124,6 @@ const AdminDashboard = () => {
       setSavingDiscounts(false);
     }
   };
-
-  // Cálculo corregido: cuenta como pendiente TODO lo que NO esté entregado, pagado definitivo o cancelado
-  const pendientes = orders.filter((o) => {
-    const estado = (o.estado || o.status || "").toLowerCase().trim();
-    // Consideramos finalizados/cerrados únicamente si están entregados o cancelados
-    const esFinalizado = estado.includes("entregado") || estado.includes("cancelado") || estado.includes("pagado");
-    return !esFinalizado;
-  }).length;
 
   return (
     <Container fluid className="px-4 pb-5" style={{ backgroundColor: CREAM, minHeight: "100vh" }}>
@@ -179,7 +172,6 @@ const AdminDashboard = () => {
                 onClick={() => navigate("/admin/orders")}
               />
             </Col>
-            
             <Col md={6} lg={3}>
               <StatCard
                 icon={FaImages}
@@ -195,16 +187,26 @@ const AdminDashboard = () => {
             <Col lg={12}>
               <Card className="shadow-sm border-0 rounded-4 border-start border-4 border-warning">
                 <Card.Body className="p-4">
-                  <h5 className="fw-bold mb-3 d-flex align-items-center gap-2 text-secondary">
-                    <FaPercent style={{ color: BRAND }} /> Configuración de Descuentos por Forma de Pago
-                  </h5>
+                  <div className="d-flex justify-content-between align-items-center mb-3">
+                    <h5 className="fw-bold mb-0 d-flex align-items-center gap-2 text-secondary">
+                      <FaPercent style={{ color: BRAND }} /> Configuración de Descuentos por Forma de Pago
+                    </h5>
+                    <Form.Check 
+                      type="switch"
+                      id="custom-switch-discounts"
+                      label={discountsEnabled ? "🟢 Sistema de Descuentos ACTIVO" : "🔴 Sistema de Descuentos APAGADO"}
+                      checked={discountsEnabled}
+                      onChange={(e) => setDiscountsEnabled(e.target.checked)}
+                      className="fw-bold text-dark"
+                    />
+                  </div>
                   <p className="text-muted small mb-3">
                     Define los porcentajes de descuento que se aplicarán automáticamente al finalizar la compra para efectivo y transferencia.
                   </p>
 
                   <Form onSubmit={handleSaveDiscounts}>
                     <Row className="g-3 align-items-end">
-                      <Col md={5}>
+                      <Col md={4}>
                         <Form.Group>
                           <Form.Label className="fw-semibold small text-muted">Descuento en Efectivo (%)</Form.Label>
                           <InputGroup>
@@ -212,6 +214,7 @@ const AdminDashboard = () => {
                               type="number"
                               min="0"
                               max="100"
+                              disabled={!discountsEnabled}
                               value={cashDiscount}
                               onChange={(e) => setCashDiscount(e.target.value)}
                               className="rounded-start-3 py-2"
@@ -221,7 +224,7 @@ const AdminDashboard = () => {
                         </Form.Group>
                       </Col>
 
-                      <Col md={5}>
+                      <Col md={4}>
                         <Form.Group>
                           <Form.Label className="fw-semibold small text-muted">Descuento por Transferencia (%)</Form.Label>
                           <InputGroup>
@@ -229,6 +232,7 @@ const AdminDashboard = () => {
                               type="number"
                               min="0"
                               max="100"
+                              disabled={!discountsEnabled}
                               value={transferDiscount}
                               onChange={(e) => setTransferDiscount(e.target.value)}
                               className="rounded-start-3 py-2"
@@ -238,14 +242,14 @@ const AdminDashboard = () => {
                         </Form.Group>
                       </Col>
 
-                      <Col md={2}>
+                      <Col md={4}>
                         <Button
                           type="submit"
                           disabled={savingDiscounts}
                           className="w-100 rounded-pill py-2 fw-semibold border-0 text-white"
                           style={{ backgroundColor: BRAND }}
                         >
-                          <FaSave className="me-1" /> {savingDiscounts ? "Guardando..." : "Guardar"}
+                          <FaSave className="me-1" /> {savingDiscounts ? "Guardando..." : "Guardar Cambios"}
                         </Button>
                       </Col>
                     </Row>
@@ -255,7 +259,7 @@ const AdminDashboard = () => {
             </Col>
           </Row>
 
-          {/* Últimos Pedidos (Ampliados a 10 para mejor visibilidad) */}
+          {/* Últimos Pedidos */}
           <Row>
             <Col>
               <Card className="shadow-sm border-0 rounded-4">
@@ -280,9 +284,9 @@ const AdminDashboard = () => {
                     orders
                       .slice(0, 10)
                       .map((o, i) => {
-                        const clienteNombre = o.cliente?.nombre || o.cliente?.email || "Sin cliente";
+                        const clienteNombre = o.cliente?.nombre || o.customer_name || "Sin cliente";
                         const numeroOrd = o.numero_orden || o.numeroOrden || `ORD-${i + 1}`;
-                        const estadoOrd = o.estado || "Confirmada";
+                        const estadoOrd = o.estado || o.status || "Confirmada";
                         const totalOrd = o.total || 0;
                         const lowerEstado = estadoOrd.toLowerCase();
 
