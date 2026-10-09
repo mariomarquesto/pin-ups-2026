@@ -7,6 +7,19 @@ import { FaUser, FaUserPlus } from "react-icons/fa";
 import { MdEmail, MdLockOutline } from "react-icons/md";
 import { supabase } from "../config/supabase";
 
+// Paleta chocolate Pin Ups
+const THEME = {
+  primary: "#3E2723",
+  primaryDark: "#2D1B15",
+  background: "#FFFFFF",
+  backgroundAlt: "#F5F0EB",
+  textPrimary: "#1A1A1A",
+  textSecondary: "#4E342E",
+  textMuted: "#8D6E63",
+  border: "#D7CCC8",
+  textLight: "#F5F0EB",
+};
+
 const Register = () => {
   const navigate = useNavigate();
   const [validated, setValidated] = useState(false);
@@ -38,15 +51,13 @@ const Register = () => {
       const emailLimpio = input.email.trim().toLowerCase();
       const nombreLimpio = input.nombre.trim();
 
-      console.log("📝 Registrando usuario:", { email: emailLimpio, nombre: nombreLimpio });
-
       // 1. Crear usuario en Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: emailLimpio,
         password: input.password,
         options: {
           data: {
-            nombre: nombreLimpio,      // ✅ el trigger lo va a leer
+            nombre: nombreLimpio,
             role: "client",
           },
         },
@@ -55,14 +66,10 @@ const Register = () => {
       if (error) throw error;
       if (!data?.user) throw new Error("No se pudo crear el usuario.");
 
-      console.log("✅ Usuario creado en auth.users:", data.user.id);
-
-      // 2. Esperar un momento y verificar si el trigger ya creó el perfil
-      //    Si no, lo insertamos manualmente desde el frontend
+      // 2. Verificar si el trigger ya creó el perfil
       let perfilCreado = false;
 
       try {
-        // Pequeño delay para dar tiempo al trigger
         await new Promise((r) => setTimeout(r, 800));
 
         const { data: perfilExistente } = await supabase
@@ -73,7 +80,6 @@ const Register = () => {
 
         if (perfilExistente) {
           perfilCreado = true;
-          console.log("✅ Perfil ya creado por el trigger");
         }
       } catch (err) {
         console.warn("No se pudo verificar el perfil:", err);
@@ -88,15 +94,13 @@ const Register = () => {
               {
                 id: data.user.id,
                 email: emailLimpio,
-                nombre: nombreLimpio,   // ✅ columna correcta
+                nombre: nombreLimpio,
                 role: "client",
               },
             ]);
 
           if (profileError) {
             console.warn("⚠️ Error al insertar perfil manualmente:", profileError.message);
-          } else {
-            console.log("✅ Perfil insertado manualmente");
           }
         } catch (profileErr) {
           console.warn("⚠️ Excepción al insertar perfil:", profileErr);
@@ -141,14 +145,29 @@ const Register = () => {
   };
 
   return (
-    <Container fluid className="py-4 py-md-5" style={{ backgroundColor: '#fef6f0', minHeight: '100vh' }}>
-      <Row className="justify-content-center align-items-center" style={{ minHeight: 'calc(100vh - 3rem)' }}>
+    <Container
+      fluid
+      className="py-4 py-md-5"
+      style={{ backgroundColor: THEME.backgroundAlt, minHeight: "100vh" }}
+    >
+      <Row
+        className="justify-content-center align-items-center"
+        style={{ minHeight: "calc(100vh - 3rem)" }}
+      >
         <Col xs={12} sm={10} md={8} lg={5} xl={4}>
           <Card className="border-0 shadow-lg rounded-4 overflow-hidden">
-            <div className="text-center pt-4 pb-2" style={{ backgroundColor: '#f85606' }}>
-              <FaUserPlus size={35} className="text-white mb-2" />
-              <h4 className="text-white mb-0">Crear Cuenta</h4>
-              <p className="text-white-50 small mb-0">Unite a Pin Ups</p>
+            {/* Header decorativo */}
+            <div
+              className="text-center pt-4 pb-2"
+              style={{ backgroundColor: THEME.primary }}
+            >
+              <FaUserPlus size={35} className="mb-2" style={{ color: THEME.textLight }} />
+              <h4 className="mb-0" style={{ color: THEME.textLight }}>
+                Crear Cuenta
+              </h4>
+              <p className="small mb-0" style={{ color: THEME.textLight, opacity: 0.7 }}>
+                Unite a Pin Ups
+              </p>
             </div>
 
             <Card.Body className="p-4 p-md-5">
@@ -164,11 +183,24 @@ const Register = () => {
               )}
 
               <Form noValidate validated={validated} onSubmit={handleRegister}>
+                {/* Nombre */}
                 <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small text-muted">Nombre completo</Form.Label>
+                  <Form.Label
+                    className="fw-semibold small"
+                    style={{ color: THEME.textMuted }}
+                  >
+                    Nombre completo
+                  </Form.Label>
                   <InputGroup hasValidation>
-                    <InputGroup.Text className="bg-light border-end-0 rounded-3">
-                      <FaUser className="text-muted" />
+                    <InputGroup.Text
+                      className="border-end-0 rounded-3"
+                      style={{
+                        backgroundColor: THEME.backgroundAlt,
+                        borderColor: THEME.border,
+                        color: THEME.textMuted,
+                      }}
+                    >
+                      <FaUser />
                     </InputGroup.Text>
                     <Form.Control
                       required
@@ -178,6 +210,7 @@ const Register = () => {
                       value={input.nombre}
                       onChange={handleInputChange}
                       className="border-start-0 rounded-3 py-2"
+                      style={{ borderColor: THEME.border }}
                     />
                     <Form.Control.Feedback type="invalid">
                       Por favor, ingresá tu nombre.
@@ -185,11 +218,24 @@ const Register = () => {
                   </InputGroup>
                 </Form.Group>
 
+                {/* Email */}
                 <Form.Group className="mb-3">
-                  <Form.Label className="fw-semibold small text-muted">Correo electrónico</Form.Label>
+                  <Form.Label
+                    className="fw-semibold small"
+                    style={{ color: THEME.textMuted }}
+                  >
+                    Correo electrónico
+                  </Form.Label>
                   <InputGroup hasValidation>
-                    <InputGroup.Text className="bg-light border-end-0 rounded-3">
-                      <MdEmail className="text-muted" />
+                    <InputGroup.Text
+                      className="border-end-0 rounded-3"
+                      style={{
+                        backgroundColor: THEME.backgroundAlt,
+                        borderColor: THEME.border,
+                        color: THEME.textMuted,
+                      }}
+                    >
+                      <MdEmail />
                     </InputGroup.Text>
                     <Form.Control
                       required
@@ -199,6 +245,7 @@ const Register = () => {
                       value={input.email}
                       onChange={handleInputChange}
                       className="border-start-0 rounded-3 py-2"
+                      style={{ borderColor: THEME.border }}
                     />
                     <Form.Control.Feedback type="invalid">
                       Por favor, ingresá un email válido.
@@ -206,11 +253,24 @@ const Register = () => {
                   </InputGroup>
                 </Form.Group>
 
+                {/* Contraseña */}
                 <Form.Group className="mb-4">
-                  <Form.Label className="fw-semibold small text-muted">Contraseña</Form.Label>
+                  <Form.Label
+                    className="fw-semibold small"
+                    style={{ color: THEME.textMuted }}
+                  >
+                    Contraseña
+                  </Form.Label>
                   <InputGroup hasValidation>
-                    <InputGroup.Text className="bg-light border-end-0 rounded-3">
-                      <MdLockOutline className="text-muted" />
+                    <InputGroup.Text
+                      className="border-end-0 rounded-3"
+                      style={{
+                        backgroundColor: THEME.backgroundAlt,
+                        borderColor: THEME.border,
+                        color: THEME.textMuted,
+                      }}
+                    >
+                      <MdLockOutline />
                     </InputGroup.Text>
                     <Form.Control
                       required
@@ -221,6 +281,7 @@ const Register = () => {
                       value={input.password}
                       onChange={handleInputChange}
                       className="border-start-0 rounded-3 py-2"
+                      style={{ borderColor: THEME.border }}
                     />
                     <Form.Control.Feedback type="invalid">
                       La contraseña debe tener al menos 6 caracteres.
@@ -228,21 +289,36 @@ const Register = () => {
                   </InputGroup>
                 </Form.Group>
 
+                {/* Botón */}
                 <div className="d-grid gap-2 mb-3">
                   <Button
                     type="submit"
                     disabled={loading}
                     className="py-2 rounded-pill fw-semibold border-0"
-                    style={{ backgroundColor: '#f85606', color: 'white' }}
+                    style={{
+                      backgroundColor: THEME.primary,
+                      color: "#FFFFFF",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.backgroundColor = THEME.primaryDark)
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.backgroundColor = THEME.primary)
+                    }
                   >
                     {loading ? "Registrando..." : "Registrarse 💖"}
                   </Button>
                 </div>
 
+                {/* Link a login */}
                 <div className="text-center">
-                  <p className="small text-muted mb-0">
-                    ¿Ya tenés cuenta?{' '}
-                    <Link to="/login" className="text-decoration-none fw-semibold" style={{ color: '#f85606' }}>
+                  <p className="small mb-0" style={{ color: THEME.textMuted }}>
+                    ¿Ya tenés cuenta?{" "}
+                    <Link
+                      to="/login"
+                      className="text-decoration-none fw-semibold"
+                      style={{ color: THEME.primary }}
+                    >
                       Iniciá sesión
                     </Link>
                   </p>
