@@ -1,5 +1,16 @@
 /* src/pages/ProductDetails.css */
 
+/* Paleta chocolate */
+:root {
+  --color-primary: #3E2723;
+  --color-primary-dark: #2D1B15;
+  --color-background: #FFFFFF;
+  --color-background-alt: #F5F0EB;
+  --color-text: #1A1A1A;
+  --color-text-muted: #8D6E63;
+  --color-border: #D7CCC8;
+}
+
 /* Animación suave para imágenes */
 img {
   transition: transform 0.3s ease;
@@ -16,7 +27,7 @@ img:hover {
 }
 
 .cursor-pointer:hover {
-  color: #f85606;
+  color: var(--color-primary);
 }
 
 /* Badge descuento */
@@ -26,7 +37,12 @@ img:hover {
 
 /* Miniaturas activas */
 .border-warning {
-  border-color: #f85606 !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Efecto hover en el corazón de favoritos */
+.hover-scale:hover {
+  transform: scale(1.1);
 }
 
 /* Responsive */

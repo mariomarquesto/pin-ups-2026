@@ -1,3 +1,5 @@
+// src/pages/Home.jsx
+
 import { useState, useEffect } from 'react';
 import Slider from '../../src/components/Slider';
 import ProductContainer from '../../src/components/JustForYou';
@@ -5,6 +7,14 @@ import { Container } from 'react-bootstrap';
 import Categories from '../components/Categories';
 import OfertaPopup from '../components/OfertaPopup';
 import { supabase } from '../config/supabase';
+
+// Paleta chocolate Pin Ups
+const THEME = {
+  primary: "#3E2723",
+  background: "#FFFFFF",
+  backgroundAlt: "#F5F0EB",
+  border: "#D7CCC8",
+};
 
 const Home = () => {
   const [bannerUrl, setBannerUrl] = useState('/pin-ups-baner.png');
@@ -33,35 +43,40 @@ const Home = () => {
   }, []);
 
   return (
-    <>
-      {/* Slider - ancho completo con un margen superior (mt-3) para separarlo del navbar */}
+    <div style={{ backgroundColor: THEME.backgroundAlt, minHeight: '100vh' }}>
+      {/* Slider */}
       <div className="w-100 mt-3">
         <Slider />
       </div>
-      
+
       <Categories />
 
-      {/* Contenido con container para mantener márgenes */}
+      {/* Contenido con container */}
       <Container>
         <div className="banner mt-3">
-          <img 
-            src={bannerUrl} 
-            alt="Banner Image" 
-            style={{ 
-              width: '100%', 
-              height: '180px',            
-              maxHeight: '180px',         
-              borderRadius: '8px', 
-              objectFit: 'cover',         
-              objectPosition: 'center'    
-            }} 
-            onError={(e) => { e.target.src = '/pin-ups-baner.png'; }} 
+          <img
+            src={bannerUrl}
+            alt="Banner Image"
+            style={{
+              width: '100%',
+              height: '180px',
+              maxHeight: '180px',
+              borderRadius: '12px',
+              objectFit: 'cover',
+              objectPosition: 'center',
+              border: `1px solid ${THEME.border}`,
+              boxShadow: '0 4px 12px rgba(62, 39, 35, 0.08)',
+            }}
+            onError={(e) => {
+              e.target.src = '/pin-ups-baner.png';
+            }}
           />
         </div>
+
         <OfertaPopup />
         <ProductContainer />
       </Container>
-    </>
+    </div>
   );
 };
 

@@ -1,4 +1,15 @@
 /* src/pages/Home.css */
+
+/* Paleta chocolate */
+:root {
+  --color-primary: #3E2723;
+  --color-primary-dark: #2D1B15;
+  --color-background: #FFFFFF;
+  --color-background-alt: #F5F0EB;
+  --color-border: #D7CCC8;
+}
+
+/* Hero section */
 .heroSection {
   margin: 0;
   padding: 0;
@@ -9,7 +20,9 @@
 .heroSection .carousel-inner,
 .heroSection .carousel-item img {
   border-radius: 0 !important;
-}a/* Eliminar márgenes y paddings del slider */
+}
+
+/* Eliminar márgenes y paddings del slider */
 .carousel,
 .carousel-inner,
 .carousel-item {
@@ -23,7 +36,26 @@
   object-fit: cover;
 }
 
-/* Asegurar que no haya bordes redondeados */
 .carousel-item:first-child img {
   border-radius: 0 !important;
+}
+
+/* Banner */
+.banner {
+  margin: 1rem 0;
+}
+
+.banner img {
+  display: block;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.banner img:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(62, 39, 35, 0.15);
+}
+
+/* Fondo general de la home */
+body {
+  background-color: var(--color-background-alt);
 }

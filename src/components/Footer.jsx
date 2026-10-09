@@ -1,11 +1,21 @@
+// src/components/Footer.jsx
+
 import { Link } from "react-router-dom";
+
+// Paleta chocolate Pin Ups
+const THEME = {
+  primary: "#3E2723",       // chocolate oscuro (fondo del footer)
+  primaryDark: "#2D1B15",   // chocolate más oscuro (hover)
+  background: "#FFFFFF",    // blanco puro
+  textLight: "#F5F0EB",     // blanco chocolate (textos sobre fondo oscuro)
+};
 
 function Footer() {
   return (
     <footer
       className="pt-5 pb-4 mt-5"
       style={{
-        backgroundColor: "#f85606",
+        backgroundColor: THEME.primary,
         borderTop: "1px solid rgba(255,255,255,0.1)",
       }}
     >
@@ -16,7 +26,7 @@ function Footer() {
             <h5
               className="fw-semibold mb-3"
               style={{
-                color: "white",
+                color: THEME.textLight,
                 fontSize: "0.9rem",
                 letterSpacing: "2px",
               }}
@@ -28,8 +38,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/helpcenter"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                 >
@@ -40,8 +54,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/helpcenter"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                 >
@@ -52,8 +70,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/helpcenter"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                 >
@@ -68,7 +90,7 @@ function Footer() {
             <h5
               className="fw-semibold mb-3"
               style={{
-                color: "white",
+                color: THEME.textLight,
                 fontSize: "0.9rem",
                 letterSpacing: "2px",
               }}
@@ -80,8 +102,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/nosotras"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                   onClick={() => window.scrollTo(0, 0)}
@@ -93,8 +119,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/location"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                   onClick={() => window.scrollTo(0, 0)}
@@ -106,8 +136,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/termsandconditions"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                   onClick={() => window.scrollTo(0, 0)}
@@ -119,8 +153,12 @@ function Footer() {
               <li className="mb-2">
                 <Link
                   to="/privacypolicy"
-                  className="text-white text-decoration-none small"
-                  style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                  className="text-decoration-none small"
+                  style={{
+                    color: THEME.textLight,
+                    opacity: 0.8,
+                    transition: "opacity 0.3s ease",
+                  }}
                   onMouseEnter={(e) => (e.target.style.opacity = "1")}
                   onMouseLeave={(e) => (e.target.style.opacity = "0.8")}
                   onClick={() => window.scrollTo(0, 0)}
@@ -136,7 +174,7 @@ function Footer() {
             <h5
               className="fw-semibold mb-3"
               style={{
-                color: "white",
+                color: THEME.textLight,
                 fontSize: "0.9rem",
                 letterSpacing: "2px",
               }}
@@ -145,16 +183,40 @@ function Footer() {
             </h5>
 
             <div className="d-flex flex-wrap gap-2 mb-4">
-              <span className="badge bg-white text-dark px-3 py-2 fw-normal rounded-pill">
+              <span
+                className="badge px-3 py-2 fw-normal rounded-pill"
+                style={{
+                  backgroundColor: THEME.textLight,
+                  color: THEME.primary,
+                }}
+              >
                 Efectivo
               </span>
-              <span className="badge bg-white text-dark px-3 py-2 fw-normal rounded-pill">
+              <span
+                className="badge px-3 py-2 fw-normal rounded-pill"
+                style={{
+                  backgroundColor: THEME.textLight,
+                  color: THEME.primary,
+                }}
+              >
                 Mercado Pago
               </span>
-              <span className="badge bg-white text-dark px-3 py-2 fw-normal rounded-pill">
+              <span
+                className="badge px-3 py-2 fw-normal rounded-pill"
+                style={{
+                  backgroundColor: THEME.textLight,
+                  color: THEME.primary,
+                }}
+              >
                 Transferencia
               </span>
-              <span className="badge bg-white text-dark px-3 py-2 fw-normal rounded-pill">
+              <span
+                className="badge px-3 py-2 fw-normal rounded-pill"
+                style={{
+                  backgroundColor: THEME.textLight,
+                  color: THEME.primary,
+                }}
+              >
                 Tarjetas
               </span>
             </div>
@@ -162,7 +224,7 @@ function Footer() {
             <h5
               className="fw-semibold mb-3"
               style={{
-                color: "white",
+                color: THEME.textLight,
                 fontSize: "0.9rem",
                 letterSpacing: "2px",
               }}
@@ -170,7 +232,7 @@ function Footer() {
               ENVÍOS
             </h5>
 
-            <p className="small text-white" style={{ opacity: 0.8 }}>
+            <p className="small" style={{ color: THEME.textLight, opacity: 0.8 }}>
               Correo Argentino / Andreani. Envíos a todo el país.
             </p>
           </div>
@@ -185,13 +247,13 @@ function Footer() {
               className="rounded-circle mb-2"
               style={{
                 objectFit: "cover",
-                border: "2px solid white",
+                border: `2px solid ${THEME.textLight}`,
               }}
             />
 
             <p
               className="small fw-semibold mt-2"
-              style={{ color: "white" }}
+              style={{ color: THEME.textLight }}
             >
               Calidad y estilo en talles reales
             </p>
@@ -199,7 +261,7 @@ function Footer() {
             <h5
               className="fw-semibold mb-3 mt-3"
               style={{
-                color: "white",
+                color: THEME.textLight,
                 fontSize: "0.9rem",
                 letterSpacing: "2px",
               }}
@@ -210,10 +272,14 @@ function Footer() {
             <div className="d-flex gap-3 justify-content-center justify-content-md-start">
               <a
                 href="https://www.facebook.com/pinupstuc"
-                className="text-white fs-5"
+                className="fs-5"
                 target="_blank"
                 rel="noreferrer"
-                style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                style={{
+                  color: THEME.textLight,
+                  opacity: 0.8,
+                  transition: "opacity 0.3s ease",
+                }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.8")}
               >
@@ -222,10 +288,14 @@ function Footer() {
 
               <a
                 href="https://www.tiktok.com/@pinupstuc"
-                className="text-white fs-5"
+                className="fs-5"
                 target="_blank"
                 rel="noreferrer"
-                style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                style={{
+                  color: THEME.textLight,
+                  opacity: 0.8,
+                  transition: "opacity 0.3s ease",
+                }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.8")}
               >
@@ -234,10 +304,14 @@ function Footer() {
 
               <a
                 href="https://www.instagram.com/pinupstuc"
-                className="text-white fs-5"
+                className="fs-5"
                 target="_blank"
                 rel="noreferrer"
-                style={{ opacity: 0.8, transition: "opacity 0.3s ease" }}
+                style={{
+                  color: THEME.textLight,
+                  opacity: 0.8,
+                  transition: "opacity 0.3s ease",
+                }}
                 onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
                 onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.8")}
               >
@@ -255,7 +329,10 @@ function Footer() {
         />
 
         <div className="text-center pt-3 pb-2">
-          <p className="small text-white mb-0" style={{ opacity: 0.7 }}>
+          <p
+            className="small mb-0"
+            style={{ color: THEME.textLight, opacity: 0.7 }}
+          >
             © {new Date().getFullYear()} Pin Ups · Moda para talles reales ·
             Hecho con 💖 para vos
           </p>

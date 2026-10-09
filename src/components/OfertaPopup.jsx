@@ -1,3 +1,5 @@
+// src/components/OfertaPopup.jsx
+
 import { useState, useEffect } from 'react';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
@@ -5,6 +7,17 @@ import { supabase } from '../config/supabase';
 
 // Imagen local por defecto como respaldo seguro
 import popUps1 from '../images/pop-ups1.png';
+
+// Paleta chocolate Pin Ups
+const THEME = {
+  primary: "#3E2723",       // chocolate oscuro (marca principal)
+  primaryDark: "#2D1B15",   // chocolate más oscuro (hover)
+  background: "#FFFFFF",    // blanco puro
+  backgroundAlt: "#F5F0EB", // blanco chocolate (fondo de la imagen)
+  textLight: "#F5F0EB",     // blanco chocolate (textos sobre fondo oscuro)
+  textSecondary: "#4E342E", // chocolate medio (textos secundarios)
+  border: "#D7CCC8",        // chocolate claro (bordes)
+};
 
 function OfertaPopup() {
   const [show, setShow] = useState(false);
@@ -37,34 +50,77 @@ function OfertaPopup() {
   return (
     <Modal show={show} onHide={() => setShow(false)} centered size="md">
       <Modal.Body className="text-center p-0 position-relative rounded-4 overflow-hidden bg-white">
-        <button 
+        {/* Botón cerrar */}
+        <button
           onClick={() => setShow(false)}
-          className="position-absolute top-0 end-0 m-3 border-0 bg-dark bg-opacity-50 text-white rounded-circle d-flex align-items-center justify-content-center"
-          style={{ width: '32px', height: '32px', zIndex: 10, cursor: 'pointer' }}
+          className="position-absolute top-0 end-0 m-3 border-0 rounded-circle d-flex align-items-center justify-content-center"
+          style={{
+            width: '32px',
+            height: '32px',
+            zIndex: 10,
+            cursor: 'pointer',
+            backgroundColor: 'rgba(62, 39, 35, 0.7)',
+            color: THEME.textLight,
+            transition: 'background-color 0.2s ease',
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.backgroundColor = 'rgba(62, 39, 35, 1)')
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.backgroundColor = 'rgba(62, 39, 35, 0.7)')
+          }
         >
           &times;
         </button>
-        
-        {/* Contenedor de imagen con tamaño estricto y controlado */}
-        <div style={{ width: '100%', height: '240px', backgroundColor: '#f8f9fa' }}>
-          <img 
-              src={popupUrl} 
-              alt="Oferta Especial Pin Ups" 
-              className="w-100 h-100" 
-              style={{ objectFit: 'cover', objectPosition: 'center' }} 
-              onError={(e) => { e.target.src = popUps1; }}
+
+        {/* Imagen */}
+        <div
+          style={{
+            width: '100%',
+            height: '240px',
+            backgroundColor: THEME.backgroundAlt,
+          }}
+        >
+          <img
+            src={popupUrl}
+            alt="Oferta Especial Pin Ups"
+            className="w-100 h-100"
+            style={{ objectFit: 'cover', objectPosition: 'center' }}
+            onError={(e) => {
+              e.target.src = popUps1;
+            }}
           />
         </div>
-        
+
+        {/* Contenido */}
         <div className="p-4">
-          <h2 className="fw-bold mb-2" style={{ color: '#f85606', fontSize: '1.5rem' }}>¡Edición Limitada!</h2>
-          <p className="text-muted small mb-3">Selección exclusiva para tus curvas por tiempo limitado.</p>
-          <Button 
-              className="px-5 py-2 w-100 rounded-pill fw-semibold shadow-sm"
-              style={{ backgroundColor: '#f85606', border: 'none' }} 
-              onClick={() => setShow(false)}
+          <h2
+            className="fw-bold mb-2"
+            style={{ color: THEME.primary, fontSize: '1.5rem' }}
           >
-              Comprar Ahora
+            ¡Edición Limitada!
+          </h2>
+
+          <p className="small mb-3" style={{ color: THEME.textSecondary }}>
+            Selección exclusiva para tus curvas por tiempo limitado.
+          </p>
+
+          <Button
+            className="px-5 py-2 w-100 rounded-pill fw-semibold shadow-sm"
+            style={{
+              backgroundColor: THEME.primary,
+              border: 'none',
+              color: THEME.textLight,
+            }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.backgroundColor = THEME.primaryDark)
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.backgroundColor = THEME.primary)
+            }
+            onClick={() => setShow(false)}
+          >
+            Comprar Ahora
           </Button>
         </div>
       </Modal.Body>

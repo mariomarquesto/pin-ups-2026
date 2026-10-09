@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Table, Button, Modal, Form, Spinner, Alert, Badge, FormCheck } from 'react-bootstrap';
+import { Container, Table, Button, Modal, Form, Spinner, Alert, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { supabase } from '../../config/supabase';
 import { FaArrowLeft, FaPlus, FaTrash, FaEdit } from 'react-icons/fa';
@@ -31,7 +31,7 @@ const tallesPorCategoria = {
 
 // Colores disponibles frecuentes para selección rápida
 const coloresDisponibles = [
-  'Negro', 'Blanco', 'Rojo', 'Azul', 'Rosa', 'Beige', 
+  'Negro', 'Blanco', 'Rojo', 'Azul', 'Rosa', 'Beige',
   'Verde', 'Gris', 'Marrón', 'Celeste', 'Amarillo', 'Estampado'
 ];
 
@@ -44,30 +44,88 @@ const formatearPrecio = (precio) => {
   }).format(precio || 0);
 };
 
+/**
+ * Sincroniza product_variants con los talles/colores del producto.
+ * Genera el producto cartesiano talles × colores y reparte el stock.
+ */
+const syncProductVariants = async (productId, sizes = [], colors = [], stockTotal = 0) => {
+  const numericId = parseInt(productId, 10);
+  if (isNaN(numericId)) throw new Error('productId inválido');
+
+  const tallas = (sizes || []).map(s => String(s).trim()).filter(Boolean);
+  const colores = (colors || []).map(c => String(c).trim()).filter(Boolean);
+
+  // 1. Borrar TODAS las variantes viejas del producto
+  const { error: deleteError } = await supabase
+    .from('product_variants')
+    .delete()
+    .eq('product_id', numericId);
+
+  if (deleteError) throw deleteError;
+
+  // 2. Si no hay talles ni colores, no insertamos nada
+  if (tallas.length === 0 && colores.length === 0) {
+    console.log(`ℹ️ Producto ${numericId} sin variantes.`);
+    return 0;
+  }
+
+  const tallasFinal = tallas.length > 0 ? tallas : ['Único'];
+  const coloresFinal = colores.length > 0 ? colores : ['Único'];
+
+  // 3. Producto cartesiano con reparto de stock equitativo
+  const totalCombinaciones = tallasFinal.length * coloresFinal.length;
+  const stockNum = parseInt(stockTotal, 10) || 0;
+  const base = Math.floor(stockNum / totalCombinaciones);
+  const sobrante = stockNum % totalCombinaciones;
+
+  const nuevasVariantes = [];
+  let idx = 0;
+  for (const size of tallasFinal) {
+    for (const color of coloresFinal) {
+      nuevasVariantes.push({
+        product_id: numericId,
+        size,
+        color,
+        stock: base + (idx < sobrante ? 1 : 0),
+      });
+      idx++;
+    }
+  }
+
+  // 4. Insertar
+  const { error: insertError } = await supabase
+    .from('product_variants')
+    .insert(nuevasVariantes);
+
+  if (insertError) throw insertError;
+
+  console.log(`✅ Sincronizadas ${nuevasVariantes.length} variantes para producto ${numericId}`);
+  return nuevasVariantes.length;
+};
+
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isOpenModal, setIsOpenModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  
+
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Formulario con manejo de talles (array o string) y colores seleccionados
-  const [formData, setFormData] = useState({ 
-    name: '', 
+  const [formData, setFormData] = useState({
+    name: '',
     description: '',
-    price: '', 
-    category: 'remeras', 
+    price: '',
+    category: 'remeras',
     stock: '',
-    selectedSizes: [], // Talles seleccionados
-    selectedColors: [], // Colores seleccionados
+    selectedSizes: [],
+    selectedColors: [],
     image1: '', colorImage1: '',
     image2: '', colorImage2: '',
     image3: '', colorImage3: ''
   });
-  
+
   const [imageFiles, setImageFiles] = useState({ file1: null, file2: null, file3: null });
 
   const fetchProducts = async () => {
@@ -94,17 +152,17 @@ const AdminProducts = () => {
 
   const handleOpenCreate = () => {
     setEditingProduct(null);
-    setFormData({ 
-      name: '', 
+    setFormData({
+      name: '',
       description: '',
-      price: '', 
-      category: 'remeras', 
+      price: '',
+      category: 'remeras',
       stock: '',
       selectedSizes: [],
       selectedColors: [],
-      image1: '', colorImage1: '', 
-      image2: '', colorImage2: '', 
-      image3: '', colorImage3: '' 
+      image1: '', colorImage1: '',
+      image2: '', colorImage2: '',
+      image3: '', colorImage3: ''
     });
     setImageFiles({ file1: null, file2: null, file3: null });
     setIsOpenModal(true);
@@ -112,10 +170,9 @@ const AdminProducts = () => {
 
   const handleOpenEdit = (product) => {
     setEditingProduct(product);
-    
-    // Parseamos las imágenes
+
     const rawImages = Array.isArray(product.images) ? product.images : (product.images ? [product.images] : []);
-    
+
     let img1 = '', col1 = '';
     let img2 = '', col2 = '';
     let img3 = '', col3 = '';
@@ -144,7 +201,7 @@ const AdminProducts = () => {
       if (index === 2) { img3 = url; col3 = color; }
     });
 
-    // Intentamos extraer talles y colores de la descripción guardada previamente (ej: "Talles: S, M | Colores: Negro, Rojo - ...")
+    // Extraer talles/colores de la descripción
     let parsedSizes = [];
     let parsedColors = [];
     let cleanDescription = product.description || '';
@@ -159,7 +216,6 @@ const AdminProducts = () => {
           parsedColors = part.replace('Colores:', '').trim().split(',').map(c => c.trim()).filter(Boolean);
         }
       });
-      // Dejamos el resto de la descripción limpia
       const descPart = parts.find(p => !p.includes('Talles:') && !p.includes('Colores:'));
       if (descPart) cleanDescription = descPart.trim();
     }
@@ -181,27 +237,25 @@ const AdminProducts = () => {
     setIsOpenModal(true);
   };
 
-  // Manejo de selección múltiple de talles
   const handleSizeToggle = (size) => {
     setFormData(prev => {
       const exists = prev.selectedSizes.includes(size);
       return {
         ...prev,
-        selectedSizes: exists 
-          ? prev.selectedSizes.filter(s => s !== size) 
+        selectedSizes: exists
+          ? prev.selectedSizes.filter(s => s !== size)
           : [...prev.selectedSizes, size]
       };
     });
   };
 
-  // Manejo de selección múltiple de colores
   const handleColorToggle = (color) => {
     setFormData(prev => {
       const exists = prev.selectedColors.includes(color);
       return {
         ...prev,
-        selectedColors: exists 
-          ? prev.selectedColors.filter(c => c !== color) 
+        selectedColors: exists
+          ? prev.selectedColors.filter(c => c !== color)
           : [...prev.selectedColors, color]
       };
     });
@@ -225,6 +279,12 @@ const AdminProducts = () => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
+
+    if (formData.selectedSizes.length === 0) {
+      setErrorMsg('Seleccioná al menos un talle.');
+      return;
+    }
+
     setUploadingImage(true);
 
     try {
@@ -238,10 +298,9 @@ const AdminProducts = () => {
         url3 ? JSON.stringify({ url: url3.trim(), color: formData.colorImage3.trim() || 'General' }) : null,
       ].filter(Boolean);
 
-      // Consolidamos la información estructurada dentro de la descripción para que viaje a la base de datos sin romper tablas
       const tallesStr = formData.selectedSizes.length > 0 ? formData.selectedSizes.join(', ') : 'Único';
       const coloresStr = formData.selectedColors.length > 0 ? formData.selectedColors.join(', ') : 'Estándar';
-      
+
       const detalleCompleto = `Talles: ${tallesStr} | Colores: ${coloresStr} | ${formData.description || ''}`;
 
       const productPayload = {
@@ -251,7 +310,12 @@ const AdminProducts = () => {
         price: Number(formData.price),
         stock: Number(formData.stock) || 0,
         images: imagesArray,
+        // Guardamos también en las columnas jsonb (por si las usás en otra parte)
+        sizes: formData.selectedSizes,
+        colors: formData.selectedColors,
       };
+
+      let productId;
 
       if (editingProduct) {
         const { error } = await supabase
@@ -260,15 +324,27 @@ const AdminProducts = () => {
           .eq('id', editingProduct.id);
 
         if (error) throw error;
+        productId = editingProduct.id;
         setSuccessMsg('¡Prenda actualizada con éxito!');
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('products')
-          .insert([productPayload]);
+          .insert([productPayload])
+          .select()
+          .single();
 
         if (error) throw error;
+        productId = data.id;
         setSuccessMsg('¡Prenda agregada con éxito!');
       }
+
+      // ⚡ SINCRONIZAR VARIANTES
+      await syncProductVariants(
+        productId,
+        formData.selectedSizes,
+        formData.selectedColors,
+        Number(formData.stock) || 0
+      );
 
       setIsOpenModal(false);
       fetchProducts();
@@ -305,7 +381,7 @@ const AdminProducts = () => {
             <h1 className="fw-bold mb-1" style={{ color: BRAND_DARK }}>Administración de Prendas</h1>
             <p className="text-muted mb-0">Controlá el catálogo, talles, colores y detalles específicos por rubro.</p>
           </div>
-          <Button 
+          <Button
             className="d-flex align-items-center gap-2 px-4 py-2 shadow-sm rounded-pill border-0 text-white"
             style={{ backgroundColor: BRAND }}
             onClick={handleOpenCreate}
@@ -344,7 +420,7 @@ const AdminProducts = () => {
                 ) : (
                   products.map((product) => {
                     const rawImgs = Array.isArray(product.images) ? product.images : [];
-                    
+
                     const validImgs = rawImgs.map(item => {
                       if (typeof item !== 'string') return null;
                       const trimmed = item.trim();
@@ -368,12 +444,12 @@ const AdminProducts = () => {
                             <div className="d-flex gap-2 align-items-center">
                               {validImgs.map((imgObj, idx) => (
                                 <div key={idx} className="text-center" style={{ width: '40px' }}>
-                                  <img 
-                                    src={imgObj.url} 
-                                    alt={`Foto ${idx+1}`} 
-                                    style={{ width: '35px', height: '35px', objectFit: 'cover' }} 
-                                    className="rounded border shadow-sm" 
-                                    onError={(e) => { e.target.style.display = 'none'; }} 
+                                  <img
+                                    src={imgObj.url}
+                                    alt={`Foto ${idx + 1}`}
+                                    style={{ width: '35px', height: '35px', objectFit: 'cover' }}
+                                    className="rounded border shadow-sm"
+                                    onError={(e) => { e.target.style.display = 'none'; }}
                                   />
                                   <div className="text-truncate text-muted" style={{ fontSize: '8px' }} title={imgObj.color}>
                                     {imgObj.color}
@@ -423,22 +499,21 @@ const AdminProducts = () => {
         </Modal.Header>
         <Form onSubmit={handleSubmit}>
           <Modal.Body className="pt-0">
-            
+
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">Nombre de la Prenda</Form.Label>
-              <Form.Control type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="Ej: Vestido Midi Florencia / Zapatilla Urbana" />
+              <Form.Control type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Ej: Vestido Midi Florencia / Zapatilla Urbana" />
             </Form.Group>
 
             <div className="row">
               <div className="col-md-6">
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold">Categoría</Form.Label>
-                  <Form.Select 
-                    value={formData.category} 
+                  <Form.Select
+                    value={formData.category}
                     onChange={(e) => {
-                      // Al cambiar categoría, limpiamos los talles seleccionados para evitar mezclar talles de calzado con remeras
                       setFormData({
-                        ...formData, 
+                        ...formData,
                         category: e.target.value,
                         selectedSizes: []
                       });
@@ -452,7 +527,6 @@ const AdminProducts = () => {
               </div>
             </div>
 
-            {/* Selector dinámico de Talles según la categoría */}
             <div className="mb-3 p-3 bg-light rounded border">
               <Form.Label className="fw-semibold d-block mb-2 text-dark">
                 Seleccionar Talles Disponibles para esta {categoryNames[formData.category]}
@@ -461,7 +535,7 @@ const AdminProducts = () => {
                 {tallesDisponiblesActuales.map((talle) => {
                   const isChecked = formData.selectedSizes.includes(talle);
                   return (
-                    <Form.Check 
+                    <Form.Check
                       key={talle}
                       type="checkbox"
                       id={`talle-${talle}`}
@@ -478,7 +552,6 @@ const AdminProducts = () => {
               )}
             </div>
 
-            {/* Selector dinámico de Colores */}
             <div className="mb-3 p-3 bg-light rounded border">
               <Form.Label className="fw-semibold d-block mb-2 text-dark">
                 Colores Disponibles
@@ -487,7 +560,7 @@ const AdminProducts = () => {
                 {coloresDisponibles.map((color) => {
                   const isChecked = formData.selectedColors.includes(color);
                   return (
-                    <Form.Check 
+                    <Form.Check
                       key={color}
                       type="checkbox"
                       id={`color-${color}`}
@@ -501,15 +574,14 @@ const AdminProducts = () => {
               </div>
             </div>
 
-            {/* Detalle específico del producto */}
             <Form.Group className="mb-3">
               <Form.Label className="fw-semibold">Descripción o Cuidados Especiales</Form.Label>
-              <Form.Control 
-                as="textarea" 
+              <Form.Control
+                as="textarea"
                 rows={2}
-                value={formData.description} 
-                onChange={(e) => setFormData({...formData, description: e.target.value})} 
-                placeholder="Ej: Algodón peinado premium, lavar con agua fría. O suela de goma antideslizante." 
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Ej: Algodón peinado premium, lavar con agua fría. O suela de goma antideslizante."
               />
             </Form.Group>
 
@@ -517,13 +589,16 @@ const AdminProducts = () => {
               <div className="col-md-6">
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold">Precio (ARS)</Form.Label>
-                  <Form.Control type="number" required value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} placeholder="25000" />
+                  <Form.Control type="number" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="25000" />
                 </Form.Group>
               </div>
               <div className="col-md-6">
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold">Stock Total</Form.Label>
-                  <Form.Control type="number" required value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} placeholder="10" />
+                  <Form.Control type="number" required value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} placeholder="10" />
+                  <Form.Text className="text-muted small">
+                    Se reparte automáticamente entre talles × colores.
+                  </Form.Text>
                 </Form.Group>
               </div>
             </div>
@@ -537,28 +612,28 @@ const AdminProducts = () => {
                 <span className="fw-semibold small text-secondary d-block mb-2">Imagen #{num}</span>
                 <div className="row g-2">
                   <div className="col-md-7">
-                    <Form.Control 
-                      type="file" 
-                      accept="image/*" 
-                      size="sm" 
+                    <Form.Control
+                      type="file"
+                      accept="image/*"
+                      size="sm"
                       className="mb-1"
-                      onChange={(e) => setImageFiles(prev => ({ ...prev, [`file${num}`]: e.target.files[0] }))} 
+                      onChange={(e) => setImageFiles(prev => ({ ...prev, [`file${num}`]: e.target.files[0] }))}
                     />
-                    <Form.Control 
-                      type="text" 
-                      size="sm" 
-                      placeholder={`O URL de imagen ${num}...`} 
-                      value={formData[`image${num}`]} 
-                      onChange={(e) => setFormData(prev => ({ ...prev, [`image${num}`]: e.target.value }))} 
+                    <Form.Control
+                      type="text"
+                      size="sm"
+                      placeholder={`O URL de imagen ${num}...`}
+                      value={formData[`image${num}`]}
+                      onChange={(e) => setFormData(prev => ({ ...prev, [`image${num}`]: e.target.value }))}
                     />
                   </div>
                   <div className="col-md-5">
-                    <Form.Control 
-                      type="text" 
-                      size="sm" 
-                      placeholder="Color de foto (Ej: Negro)" 
-                      value={formData[`colorImage${num}`]} 
-                      onChange={(e) => setFormData(prev => ({ ...prev, [`colorImage${num}`]: e.target.value }))} 
+                    <Form.Control
+                      type="text"
+                      size="sm"
+                      placeholder="Color de foto (Ej: Negro)"
+                      value={formData[`colorImage${num}`]}
+                      onChange={(e) => setFormData(prev => ({ ...prev, [`colorImage${num}`]: e.target.value }))}
                     />
                   </div>
                 </div>

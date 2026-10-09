@@ -1,21 +1,36 @@
-/* Product.css - Estilos mejorados para la tarjeta de producto */
+/* Product.css - Tarjetas de producto Pin Ups (paleta chocolate) */
+
+/* Variables de la paleta chocolate */
+:root {
+  --color-primary: #3E2723;
+  --color-primary-dark: #2D1B15;
+  --color-primary-light: #5D4037;
+  --color-background: #FFFFFF;
+  --color-background-alt: #F5F0EB;
+  --color-text: #1A1A1A;
+  --color-text-secondary: #4E342E;
+  --color-text-muted: #8D6E63;
+  --color-border: #D7CCC8;
+  --color-border-light: #EFEBE9;
+}
 
 .product-card {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, box-shadow 0.3s ease,
+    border-color 0.3s ease;
   cursor: pointer;
   width: 280px;
   max-width: 100%;
-  /* BORDE VERDE FIJO - SIEMPRE VISIBLE */
-  border: 2px solid #4CAF50 !important;
+  /* BORDE CHOCOLATE CLARO */
+  border: 2px solid var(--color-border) !important;
   border-radius: 12px;
-  background-color: #ffffff;
+  background-color: var(--color-background);
 }
 
 .product-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1) !important;
-  /* BORDE VERDE MÁS OSCURO AL HOVER */
-  border-color: #2E7D32 !important;
+  box-shadow: 0 8px 25px rgba(62, 39, 35, 0.15) !important;
+  /* BORDE CHOCOLATE OSCURO AL HOVER */
+  border-color: var(--color-primary) !important;
 }
 
 .product-link {
@@ -24,7 +39,7 @@
 }
 
 .img-container {
-  background-color: #f8f9fa;
+  background-color: var(--color-background-alt);
   border-radius: 8px 8px 0 0;
   position: relative;
   overflow: hidden;
@@ -99,7 +114,7 @@
     120deg,
     transparent 0%,
     transparent 50%,
-    rgba(255, 255, 255, 0.15) 60%,
+    rgba(245, 240, 235, 0.25) 60%,
     transparent 70%
   );
   transform: translateX(-100%);
@@ -119,7 +134,7 @@
   .product-card {
     width: 240px;
   }
-  
+
   .product-img {
     height: 180px;
   }
@@ -134,7 +149,7 @@
   .product-card {
     width: 200px;
   }
-  
+
   .product-img {
     height: 150px;
   }

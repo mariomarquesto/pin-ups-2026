@@ -1,4 +1,6 @@
-import { Card, Container, Row, Col, Form, Button, InputGroup } from "react-bootstrap";
+// src/pages/Register.jsx
+
+import { Card, Container, Row, Col, Form, Button, InputGroup, Alert } from "react-bootstrap";
 import { useState } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaUserPlus } from "react-icons/fa";
@@ -9,6 +11,8 @@ const Register = () => {
   const navigate = useNavigate();
   const [validated, setValidated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
   const [input, setInput] = useState({
     nombre: "",
     email: "",
@@ -17,8 +21,11 @@ const Register = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    setErrorMsg("");
+    setSuccessMsg("");
+
     const form = e.currentTarget;
-    
+
     if (form.checkValidity() === false) {
       e.stopPropagation();
       setValidated(true);
@@ -27,28 +34,102 @@ const Register = () => {
 
     setLoading(true);
 
-    // 1. Creamos el usuario en Supabase Auth y pasamos el nombre en los metadatos
-    const { data, error } = await supabase.auth.signUp({
-      email: input.email.trim(),
-      password: input.password,
-      options: {
-        data: {
-          nombre: input.nombre.trim(),
-          role: 'client' // Los auto-registros siempre entran como clientes por seguridad
+    try {
+      const emailLimpio = input.email.trim().toLowerCase();
+      const nombreLimpio = input.nombre.trim();
+
+      console.log("📝 Registrando usuario:", { email: emailLimpio, nombre: nombreLimpio });
+
+      // 1. Crear usuario en Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: emailLimpio,
+        password: input.password,
+        options: {
+          data: {
+            nombre: nombreLimpio,      // ✅ el trigger lo va a leer
+            role: "client",
+          },
+        },
+      });
+
+      if (error) throw error;
+      if (!data?.user) throw new Error("No se pudo crear el usuario.");
+
+      console.log("✅ Usuario creado en auth.users:", data.user.id);
+
+      // 2. Esperar un momento y verificar si el trigger ya creó el perfil
+      //    Si no, lo insertamos manualmente desde el frontend
+      let perfilCreado = false;
+
+      try {
+        // Pequeño delay para dar tiempo al trigger
+        await new Promise((r) => setTimeout(r, 800));
+
+        const { data: perfilExistente } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (perfilExistente) {
+          perfilCreado = true;
+          console.log("✅ Perfil ya creado por el trigger");
+        }
+      } catch (err) {
+        console.warn("No se pudo verificar el perfil:", err);
+      }
+
+      // 3. Si el trigger no lo creó, lo insertamos manualmente
+      if (!perfilCreado) {
+        try {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .insert([
+              {
+                id: data.user.id,
+                email: emailLimpio,
+                nombre: nombreLimpio,   // ✅ columna correcta
+                role: "client",
+              },
+            ]);
+
+          if (profileError) {
+            console.warn("⚠️ Error al insertar perfil manualmente:", profileError.message);
+          } else {
+            console.log("✅ Perfil insertado manualmente");
+          }
+        } catch (profileErr) {
+          console.warn("⚠️ Excepción al insertar perfil:", profileErr);
         }
       }
-    });
 
-    setLoading(false);
+      // 4. Mensaje de éxito
+      if (data.session === null) {
+        setSuccessMsg(
+          "✅ ¡Registro exitoso! Te enviamos un email para confirmar tu cuenta antes de iniciar sesión."
+        );
+      } else {
+        setSuccessMsg("🎉 ¡Registro exitoso! Redirigiendo al login...");
+      }
 
-    if (error) {
-      alert("❌ Error al registrarse: " + error.message);
-      return;
-    }
+      setTimeout(() => navigate("/login"), 2000);
+    } catch (err) {
+      console.error("❌ Error al registrarse:", err);
+      let mensaje = err.message || "Error desconocido";
 
-    if (data?.user) {
-      alert("🎉 ¡Registro exitoso! Ya podés iniciar sesión.");
-      navigate("/login");
+      if (mensaje.includes("already registered") || mensaje.includes("already been registered")) {
+        mensaje = "Ese email ya está registrado. Probá iniciar sesión.";
+      } else if (mensaje.includes("invalid email") || mensaje.includes("is invalid")) {
+        mensaje = "El email no es válido. Verificá que sea un correo real.";
+      } else if (mensaje.includes("Password should be")) {
+        mensaje = "La contraseña debe tener al menos 6 caracteres.";
+      } else if (mensaje.includes("Email address") && mensaje.includes("invalid")) {
+        mensaje = "Ese email no está permitido. Configurá un SMTP propio en Supabase.";
+      }
+
+      setErrorMsg("❌ " + mensaje);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -71,8 +152,18 @@ const Register = () => {
             </div>
 
             <Card.Body className="p-4 p-md-5">
+              {errorMsg && (
+                <Alert variant="danger" dismissible onClose={() => setErrorMsg("")}>
+                  {errorMsg}
+                </Alert>
+              )}
+              {successMsg && (
+                <Alert variant="success" dismissible onClose={() => setSuccessMsg("")}>
+                  {successMsg}
+                </Alert>
+              )}
+
               <Form noValidate validated={validated} onSubmit={handleRegister}>
-                {/* Nombre */}
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold small text-muted">Nombre completo</Form.Label>
                   <InputGroup hasValidation>
@@ -94,7 +185,6 @@ const Register = () => {
                   </InputGroup>
                 </Form.Group>
 
-                {/* Email */}
                 <Form.Group className="mb-3">
                   <Form.Label className="fw-semibold small text-muted">Correo electrónico</Form.Label>
                   <InputGroup hasValidation>
@@ -116,7 +206,6 @@ const Register = () => {
                   </InputGroup>
                 </Form.Group>
 
-                {/* Contraseña */}
                 <Form.Group className="mb-4">
                   <Form.Label className="fw-semibold small text-muted">Contraseña</Form.Label>
                   <InputGroup hasValidation>
@@ -140,8 +229,8 @@ const Register = () => {
                 </Form.Group>
 
                 <div className="d-grid gap-2 mb-3">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     disabled={loading}
                     className="py-2 rounded-pill fw-semibold border-0"
                     style={{ backgroundColor: '#f85606', color: 'white' }}
